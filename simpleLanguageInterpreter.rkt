@@ -5,6 +5,8 @@
 
 (require "simpleParser.rkt")
 
+(define (atom? a)
+  (and (not (pair? a)) (not (null? a))))
 ;essentially a helper function for abstraction
 (define interpret
   (lambda (fileName)
@@ -105,7 +107,7 @@
     (cond
       ((null? state) #f)
       ((list? (headOf state)) (or (declared? var (headOf state)) (declared? var (bodyOf state))))
-      ((and (eq? (headOf state) var) (not(null? (getVal state)))) #t)
+      ((and (eq? (headOf state) var) (not (null? (getVal state)))) #t)
       (else
        (declared? var (bodyOf state))) )))
 
