@@ -5,7 +5,7 @@
 
 (require "simpleParser.rkt")
 
-;tests if input is an atom
+;check if atom
 (define (atom? a)
   (and (not (pair? a)) (not (null? a))))
 
@@ -77,7 +77,7 @@
 
 ;return the right operand
 (define getRightOp caddr)
-
+      
 ;returns the first sign in a statement
 (define getStmtType car)
 
@@ -86,7 +86,7 @@
 
 ;return value
 (define getVal cdr)
-
+      
 ;returns the first item in a list <-rename, it sounds awful
 (define headOf car)
 
@@ -123,10 +123,10 @@
       (else
        (cons (headOf state) (assign-to var (bodyOf state) val))) )))
 
-;returns if something should be considered a var or not essentially just an atom
+;returns if something should be considered a var or not
 (define var?
   (lambda (expr)
-    (if (atom? expr) #f #t) ))
+    (if (number? expr) #f #t) ))
 
 ;checks whether a var has been declared and if it is, then it returns the value of target var
 (define M-var
@@ -137,26 +137,26 @@
 (define return-var-val
   (lambda (var state)
     (cond
-      ((null? state) (error 'no_value_assigned))
+      ((null? state) '())
       ((eq? (headOf(headOf state)) var) (bodyOf (headOf state)))
       (else
-       (return-var-val var (bodyOf state))) )))
+       (return-var-val var (bodyOf state))))))
 
-
-;(declared? 'x '((a)(b)(c)))
-
-;(declared )
-;(M-var 'z '((a)(b)(c)(z)))
+;if-else statement in the form of "if condition, then stmt1. Else, stmt2
+(define cond-stmt
+  (lambda (condition stmt1 stmt2 state)
+    (if (M-value condition state) stmt1 stmt2)))
 
 ;TESTS
 
 ;(M-var 'x '((y)(x)(a)))
 ;(return-var-val 'z '((x 10)(y 25)(z 5)))
+; cond-stmt '(a == b
 
 ;(initialized? 'x '((a)(b)(x)(d)))
 
-;(interpret-start '((var x)(var y)(= x 5)(= y (+ 5 (* 7 5)))) '())
+(interpret-start '((var x)(var y)(= x 5)(= y (+ 5 (* 7 5)))) '())
 
 ;(run-program "sampleProgram.txt")
 ;(run-program "doableProgram.txt")
-(interpret-start '((var x)(var y)(var z)(= x 1)(= y (+ 5 (+ 3 2)))) '())
+;(interpret-start '((var x)(var y)(var z)(= x 1)(= y (+ 5 (+ 3 2)))(= z x)) '())
