@@ -138,6 +138,8 @@
       (else
        (return-var-val var (bodyOf state))) )))
 
+;TESTS
+
 ;(M-var 'x '((y)(x)(a)))
 ;(return-var-val 'z '((x 10)(y 25)(z 5)))
 
