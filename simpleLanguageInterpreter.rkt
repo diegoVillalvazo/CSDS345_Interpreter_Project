@@ -5,8 +5,10 @@
 
 (require "simpleParser.rkt")
 
+;tests if input is an atom
 (define (atom? a)
   (and (not (pair? a)) (not (null? a))))
+
 ;essentially a helper function for abstraction
 (define interpret
   (lambda (fileName)
@@ -75,7 +77,7 @@
 
 ;return the right operand
 (define getRightOp caddr)
-      
+
 ;returns the first sign in a statement
 (define getStmtType car)
 
@@ -83,8 +85,8 @@
 (define getVar cadr)
 
 ;return value
-(define getVal caddr)
-      
+(define getVal cdr)
+
 ;returns the first item in a list <-rename, it sounds awful
 (define headOf car)
 
@@ -106,10 +108,10 @@
   (lambda (var state)
     (cond
       ((null? state) #f)
-      ((list? (headOf state)) (or (declared? var (headOf state)) (declared? var (bodyOf state))))
-      ((and (eq? (headOf state) var) (not (null? (getVal state)))) #t)
+      ((list? (headOf state)) (or (initialized? var (headOf state)) (initialized? var (bodyOf state))))
+      ((and (eq? (headOf state) var) (not (null? (getVal state))))  #t)
       (else
-       (declared? var (bodyOf state))) )))
+       (initialized? var (bodyOf state))) )))
 
 ;returns a state in which a var already declared within a state is paired with the val
 (define assign-to
@@ -121,10 +123,10 @@
       (else
        (cons (headOf state) (assign-to var (bodyOf state) val))) )))
 
-;returns if something should be considered a var or not
+;returns if something should be considered a var or not essentially just an atom
 (define var?
   (lambda (expr)
-    (if (number? expr) #f #t) ))
+    (if (atom? expr) #f #t) ))
 
 ;checks whether a var has been declared and if it is, then it returns the value of target var
 (define M-var
@@ -135,10 +137,16 @@
 (define return-var-val
   (lambda (var state)
     (cond
-      ((null? state) '())
+      ((null? state) (error 'no_value_assigned))
       ((eq? (headOf(headOf state)) var) (bodyOf (headOf state)))
       (else
        (return-var-val var (bodyOf state))) )))
+
+
+;(declared? 'x '((a)(b)(c)))
+
+;(declared )
+;(M-var 'z '((a)(b)(c)(z)))
 
 ;TESTS
 
@@ -147,8 +155,8 @@
 
 ;(initialized? 'x '((a)(b)(x)(d)))
 
-(interpret-start '((var x)(var y)(= x 5)(= y (+ 5 (* 7 5)))) '())
+;(interpret-start '((var x)(var y)(= x 5)(= y (+ 5 (* 7 5)))) '())
 
 ;(run-program "sampleProgram.txt")
 ;(run-program "doableProgram.txt")
-;(interpret-start '((var x)(var y)(var z)(= x 1)(= y (+ 5 (+ 3 2)))(= z x)) '())
+(interpret-start '((var x)(var y)(var z)(= x 1)(= y (+ 5 (+ 3 2)))) '())
