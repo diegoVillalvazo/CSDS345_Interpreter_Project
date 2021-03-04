@@ -9,6 +9,11 @@
 (define (atom? a)
   (and (not (pair? a)) (not (null? a)) (not (boolean? a)))) ;added boolean case
 
+;helper function to start state with 'return
+(define initState
+  (lambda ()
+    '((return)) ))
+
 ;essentially a helper function for abstraction
 (define interpret
   (lambda (fileName)
@@ -17,7 +22,7 @@
 ;actually runs the program and initializes an empty state, works more like a helper function
 (define run-program
   (lambda (fileName)
-    (interpret-start (interpret fileName) '()) ))
+    (interpret-start (interpret fileName) (initState)) ))
 
 ;iterates through the statements in a statement list, takes a state
 (define interpret-start
@@ -70,7 +75,7 @@
 ;returns a statement
 (define M-return
   (lambda (stmt state)
-    state))
+    (M-value stmt state)))
 
 ;returns the value of a mathematical expression
 (define M-value
@@ -79,20 +84,21 @@
       ((number? expr) expr)
       ((boolean? expr) expr)  ;added boolean support
       ((var? expr) (M-var expr state)) ;<--- should take care of all variables
-      ((eq? (getOp expr) '+)  (+          (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
-      ((eq? (getOp expr) '-)  (-          (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
-      ((eq? (getOp expr) '*)  (*          (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
-      ((eq? (getOp expr) '/)  (quotient   (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
-      ((eq? (getOp expr) '%)  (remainder  (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
-      ((eq? (getOp expr) '==) (eq?        (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
-      ((eq? (getOp expr) '!=) (not(eq?    (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state))))
-      ((eq? (getOp expr) '<)  (<          (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
-      ((eq? (getOp expr) '>)  (>          (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
-      ((eq? (getOp expr) '<=) (<=         (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
-      ((eq? (getOp expr) '>=) (>=         (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
-      ((eq? (getOp expr) '&&) (and        (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
-      ((eq? (getOp expr) '||) (or         (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
-      ((eq? (getOp expr) '!)  (not        (M-value(getLeftOp expr) state))) ;does not work with cases such as (! #t)
+      ((eq? (getOp expr) '+)      (+          (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
+      ((eq? (getOp expr) '-)      (-          (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
+      ((eq? (getOp expr) '*)      (*          (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
+      ((eq? (getOp expr) '/)      (quotient   (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
+      ((eq? (getOp expr) '%)      (remainder  (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
+      ((eq? (getOp expr) '==)     (eq?        (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
+      ((eq? (getOp expr) '!=)     (not(eq?    (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state))))
+      ((eq? (getOp expr) '<)      (<          (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
+      ((eq? (getOp expr) '>)      (>          (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
+      ((eq? (getOp expr) '<=)     (<=         (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
+      ((eq? (getOp expr) '>=)     (>=         (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
+      ((eq? (getOp expr) '&&)     (and        (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
+      ((eq? (getOp expr) '||)     (or         (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
+      ((eq? (getOp expr) '!)      (not        (M-value(getLeftOp expr) state))) ;does not work with cases such as (! #t)
+      ((eq? (getOp expr) 'return) (M-value(getLeftOp expr) state))
       (else
        (error 'unknown_operator)) )))
 
@@ -232,7 +238,9 @@
 ;(M-value '(< a b) '((a 15)(b 14)))
 ;(interpret "sampleProgram.txt")
 
-(run-program "sampleProgram.txt")
+(interpret-start '((return a)) '((a 15)(return)))
+
+;(run-program "sampleProgram.txt")
 ;(run-program "doableProgram.txt")
 ;(interpret-start '((var x)(var y)(var z)(= x 1)(= y (+ 5 (+ 3 2)))(= z x)) '())
 ;(M-declare-assign '((var x = 5)) '())
