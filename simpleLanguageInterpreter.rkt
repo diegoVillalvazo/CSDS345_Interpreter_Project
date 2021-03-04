@@ -129,8 +129,14 @@
 ;returns result for if
 (define getStmt1 caddr)
 
+
 ;returns result for then
-(define getStmt2 cadddr)
+(define getStmt2
+  (lambda (stmt)
+    (cond
+      ((eq? (getStmtType stmt) 'if) (getStmt1 stmt)) ;if the second statement is another conditional statement, return the other conditoinal statement
+      (else (cadddr stmt))))) ;otherwise it isn't so just return the statement
+     
 
 ;returns the length of a statement
 (define getLength
@@ -226,8 +232,8 @@
 ;(M-value '(< a b) '((a 15)(b 14)))
 ;(interpret "sampleProgram.txt")
 
-;(run-program "sampleProgram.txt")
-(run-program "doableProgram.txt")
+(run-program "sampleProgram.txt")
+;(run-program "doableProgram.txt")
 ;(interpret-start '((var x)(var y)(var z)(= x 1)(= y (+ 5 (+ 3 2)))(= z x)) '())
 ;(M-declare-assign '((var x = 5)) '())
 ;(M-declare-assign '((var x = (+ 3 (* 9 1)))) '())
