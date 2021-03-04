@@ -34,6 +34,7 @@
       ((eq? (getStmtType stmt) 'var)    (M-declare stmt state))
       ((eq? (getStmtType stmt) '=)      (M-assign stmt state))
       ((eq? (getStmtType stmt) 'if)     (M-cond-stmt stmt state))
+      ((eq? (getStmtType stmt) 'while)  (M-while-loop stmt state))
       ((eq? (getStmtType stmt) 'return) (M-return stmt state))
       (else
        (error 'unknown_statement)) )))
@@ -60,7 +61,11 @@
 ;helper function that passes appropriate values for condition statement
 (define M-cond-stmt
   (lambda (stmt state)
-    (cond-stmt (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state) ))
+    (cond-stmt (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state)))
+
+(define M-while-loop
+  (lambda (stmt state)
+    (while (getCondition stmt) (getWhileBody stmt) state)))
 
 ;returns a statement
 (define M-return
@@ -130,7 +135,9 @@
 ;returns the length of a statement
 (define getLength
   (lambda (stmt)
-    (if (null? stmt) 0 (+ 1 (getLength (bodyOf stmt)))) ))
+    (if (null? stmt) 0 (+ 1 (getLength (bodyOf stmt))))))
+
+(define getWhileBody caddr)
 
 ;returns whether var has been declared by checking if it is in the state
 (define declared?
@@ -186,6 +193,13 @@
   (lambda (condition stmt1 stmt2 state)
     (if (M-value condition state) (M-state stmt1 state) (M-state stmt2 state))));stmt1 stmt2)))
 
+(define while
+  (lambda (condition loopbody state)
+    (if (M-value condition state) (while condition loopbody (M-state loopbody state)) state)))
+
+
+
+
 ;TESTS
 
 ;(M-var 'x '((y)(x)(a)))
@@ -204,16 +218,16 @@
 ;(cond-stmt '(== a b) #t #f '((a 15) (b 10)))
 ;(cond-stmt '(>= a b) #t #f '((a 15) (b 10)))
 ;(cond-stmt '(!= a b) #t #f '((a 15) (b 10)))
-(cond-stmt '(< a b) '(return #t) '(return #f) '((a 15) (b 10))) ;<--- tried adding return, all it does is return the state but like idk
-(interpret-start '((var a 10)(var b)(= b 1)(if (> b a) (var x #t) (var y #t))) '())
-(interpret-start '((var a #t)(var b #t)(= b (! b))(if (!= b a) (var c #t) (var d #t))) '())
+;(cond-stmt '(< a b) '(return #t) '(return #f) '((a 15) (b 10))) ;<--- tried adding return, all it does is return the state but like idk
+;(interpret-start '((var a 10)(var b)(= b 1)(if (> b a) (var x #t) (var y #t))) '())
+;(interpret-start '((var a #t)(var b #t)(= b (! b))(if (!= b a) (var c #t) (var d #t))) '())
 ;(M-declare-assign '(var x 10) '())
 ;(M-var 'a '((a 15)(b 16)))
 ;(M-value '(< a b) '((a 15)(b 14)))
 ;(interpret "sampleProgram.txt")
 
 ;(run-program "sampleProgram.txt")
-;(run-program "doableProgram.txt")
+(run-program "doableProgram.txt")
 ;(interpret-start '((var x)(var y)(var z)(= x 1)(= y (+ 5 (+ 3 2)))(= z x)) '())
 ;(M-declare-assign '((var x = 5)) '())
 ;(M-declare-assign '((var x = (+ 3 (* 9 1)))) '())

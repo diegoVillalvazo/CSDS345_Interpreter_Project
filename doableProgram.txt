@@ -1,6 +1,10 @@
 var x;
 x = 10;
+x = x - 1;
 var y = 3 * x + 5;
+var z = 4;
+while (z > 0)
+  z = z - 1;
 if (x > y)
   return x;
 else
