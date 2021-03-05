@@ -67,7 +67,7 @@
 ;helper function that passes appropriate values for condition statement
 (define M-cond-stmt
   (lambda (stmt state)
-    (cond-stmt (getCondition stmt) (getStmt1 stmt) (cadddr stmt) state)))
+    (cond-stmt (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state)))
 
 (define M-while-loop
   (lambda (stmt state)
@@ -136,17 +136,13 @@
 ;returns result for if
 (define getStmt1 caddr)
 
-;returns whether an atom is 'true or 'false
-;(define boolean-atom?
-;  (lambda (a)
-;    (cond
-;      (())
 
 ;returns result for then
 (define getStmt2
   (lambda (stmt)
     (cond
-      ((eq? (getStmtType stmt) 'if) (getStmt1 stmt)) ;if the second statement is another conditional statement, return the other conditoinal statement
+      ((eq? (getLength stmt) 3) (getStmt1 stmt))
+      ((eq? (getStmtType stmt) 'if) (cadddr stmt)) ;if the second statement is another conditional statement, return the other conditoinal statement
       (else (cadddr stmt))))) ;otherwise it isn't so just return the statement
      
 
@@ -216,6 +212,8 @@
     (if (M-value condition state) (while condition loopbody (M-state loopbody state)) state)))
 
 
+
+
 ;TESTS
 
 ;(M-var 'x '((y)(x)(a)))
@@ -243,16 +241,9 @@
 ;(interpret "sampleProgram.txt")
 
 ;(interpret-start '((return a)) '((a 15)(return)))
-;(interpret-start '((var x) (return (= x 4))) (initState))
-
-;(interpret-start '((var z 10) (var a (<= z 5))) (initState))
-
-;(cond-stmt '(<= z 5) '(return 5) '(return z) '((z 10)(return)))
-
-(interpret-start '((var z 10) (if (<= z 5) (return 5) (return z))) (initState))
 
 ;(run-program "sampleProgram.txt")
-;(run-program "doableProgram.txt")
+(run-program "tests/ifelsetest.txt")
 ;(interpret-start '((var x)(var y)(var z)(= x 1)(= y (+ 5 (+ 3 2)))(= z x)) '())
 ;(M-declare-assign '((var x = 5)) '())
 ;(M-declare-assign '((var x = (+ 3 (* 9 1)))) '())
