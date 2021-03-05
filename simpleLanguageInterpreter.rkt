@@ -86,7 +86,7 @@
       ((boolean? expr) expr)  ;added boolean support
       ((var? expr) (M-var expr state)) ;<--- should take care of all variables
       ((eq? (getOp expr) '+)      (+          (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
-      ((eq? (getOp expr) '-)      (-          (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
+      ((eq? (getOp expr) '-)      (checkMinusSignUsage expr state))
       ((eq? (getOp expr) '*)      (*          (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
       ((eq? (getOp expr) '/)      (quotient   (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
       ((eq? (getOp expr) '%)      (remainder  (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
@@ -102,6 +102,12 @@
       ((eq? (getOp expr) 'return) (M-value(getLeftOp expr) state))
       (else
        (error 'unknown_operator)) )))
+
+;checks if the '- is either unary or binary
+(define checkMinusSignUsage
+  (lambda (expr state)
+    (if (eq? (getLength expr) 2) (* -1 (M-value(getLeftOp expr) state)) (- (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state))) ))
+       
 
 ;return the operator
 (define getOp car)
@@ -241,9 +247,10 @@
 ;(interpret "sampleProgram.txt")
 
 ;(interpret-start '((return a)) '((a 15)(return)))
-
+(run-program "tests/test10.txt")
+(interpret-start '((var x (- 5 2))) (initState))
 ;(run-program "sampleProgram.txt")
-(run-program "tests/ifelsetest.txt")
+;(run-program "tests/ifelsetest.txt")
 ;(interpret-start '((var x)(var y)(var z)(= x 1)(= y (+ 5 (+ 3 2)))(= z x)) '())
 ;(M-declare-assign '((var x = 5)) '())
 ;(M-declare-assign '((var x = (+ 3 (* 9 1)))) '())
