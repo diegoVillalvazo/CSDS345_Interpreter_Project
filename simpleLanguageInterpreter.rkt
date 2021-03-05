@@ -20,6 +20,7 @@
     (parser fileName) ))
 
 ;actually runs the program and initializes an empty state, works more like a helper function
+(provide run-program)
 (define run-program
   (lambda (fileName)
     (interpret-start (interpret fileName) (initState)) ))
@@ -238,7 +239,7 @@
 ;(M-value '(< a b) '((a 15)(b 14)))
 ;(interpret "sampleProgram.txt")
 
-(interpret-start '((return a)) '((a 15)(return)))
+;(interpret-start '((return a)) '((a 15)(return)))
 
 ;(run-program "sampleProgram.txt")
 ;(run-program "doableProgram.txt")
