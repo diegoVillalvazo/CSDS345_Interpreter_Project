@@ -67,7 +67,7 @@
 ;helper function that passes appropriate values for condition statement
 (define M-cond-stmt
   (lambda (stmt state)
-    (cond-stmt (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state)))
+    (cond-stmt (getCondition stmt) (getStmt1 stmt) (cadddr stmt) state)))
 
 (define M-while-loop
   (lambda (stmt state)
@@ -136,6 +136,11 @@
 ;returns result for if
 (define getStmt1 caddr)
 
+;returns whether an atom is 'true or 'false
+;(define boolean-atom?
+;  (lambda (a)
+;    (cond
+;      (())
 
 ;returns result for then
 (define getStmt2
@@ -211,8 +216,6 @@
     (if (M-value condition state) (while condition loopbody (M-state loopbody state)) state)))
 
 
-
-
 ;TESTS
 
 ;(M-var 'x '((y)(x)(a)))
@@ -240,6 +243,13 @@
 ;(interpret "sampleProgram.txt")
 
 ;(interpret-start '((return a)) '((a 15)(return)))
+;(interpret-start '((var x) (return (= x 4))) (initState))
+
+;(interpret-start '((var z 10) (var a (<= z 5))) (initState))
+
+;(cond-stmt '(<= z 5) '(return 5) '(return z) '((z 10)(return)))
+
+(interpret-start '((var z 10) (if (<= z 5) (return 5) (return z))) (initState))
 
 ;(run-program "sampleProgram.txt")
 ;(run-program "doableProgram.txt")
