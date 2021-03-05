@@ -9,6 +9,29 @@
 (define (atom? a)
   (and (not (pair? a)) (not (null? a)) (not (boolean? a)))) ;added boolean case
 
+;tests if the input is the atom 'true or 'false
+(define booleanAtom?
+  (lambda (a)
+    (or (eq? a 'true) (eq? a 'false))))
+
+;converts a booleanAtom to a boolean
+(define convertToBoolean
+  (lambda (a)
+    (cond
+      ((eq? a 'true)  #t)
+      ((eq? a 'false) #f)
+      (else
+       (error 'not_a_booleanAtom)) )))
+
+;converts a proper boolean into a booleanAtom
+(define convertToProperBoolean
+  (lambda (a)
+    (cond
+      ((eq? a #t) 'true)
+      ((eq? a #f) 'false)
+      (else
+       a) )))
+
 ;helper function to start state with 'return
 (define initState
   (lambda ()
@@ -76,14 +99,14 @@
 ;returns a statement
 (define M-return
   (lambda (stmt state)
-    (M-value stmt state)))
+    (convertToProperBoolean(M-value stmt state))))
 
 ;returns the value of a mathematical expression
 (define M-value
   (lambda (expr state)
     (cond
       ((number? expr) expr)
-      ((boolean? expr) expr)  ;added boolean support
+      ((booleanAtom? expr) (convertToBoolean expr))
       ((var? expr) (M-var expr state)) ;<--- should take care of all variables
       ((eq? (getOp expr) '+)      (+          (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state)))
       ((eq? (getOp expr) '-)      (checkMinusSignUsage expr state))
@@ -247,8 +270,9 @@
 ;(interpret "sampleProgram.txt")
 
 ;(interpret-start '((return a)) '((a 15)(return)))
-(run-program "tests/test10.txt")
-(interpret-start '((var x (- 5 2))) (initState))
+;(run-program "tests/test10.txt")
+;(interpret-start '((var x (- 5 2))) (initState))
+;(interpret-start '((var x 5)(var y 6)(var a (> x y))) (initState))
 ;(run-program "sampleProgram.txt")
 ;(run-program "tests/ifelsetest.txt")
 ;(interpret-start '((var x)(var y)(var z)(= x 1)(= y (+ 5 (+ 3 2)))(= z x)) '())
