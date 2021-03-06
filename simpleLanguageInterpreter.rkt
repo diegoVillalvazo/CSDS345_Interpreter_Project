@@ -244,12 +244,12 @@
       (else
        (return-var-val var (bodyOf state))) )))
 
-;if-else statement in the form of "if condition, then stmt1. Else, stmt2
+;Evaluates an if-else statement in the form of "if condition, then stmt1. Else, stmt2"
 (define cond-stmt-with-else
   (lambda (condition stmt1 stmt2 state)
     (if (M-value condition state) (M-state stmt1 state) (M-state stmt2 state))))
 
-
+;evaluates an if statement (without else) in the form of "if condition, then stmt1."
 (define cond-stmt-no-else
   (lambda (condition stmt1 state)
     (if (M-value condition state) (M-state stmt1 state) state)))
