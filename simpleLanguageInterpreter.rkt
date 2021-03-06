@@ -90,7 +90,8 @@
 ;helper function that passes appropriate values for condition statement
 (define M-cond-stmt
   (lambda (stmt state)
-    (cond-stmt (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state)))
+    (if (equal? (getStmt1 stmt) (getStmt2 stmt)) (cond-stmt-no-else (getCondition stmt) (getStmt1 stmt) state)
+    (cond-stmt-with-else (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state))))
 
 (define M-while-loop
   (lambda (stmt state)
@@ -232,9 +233,13 @@
        (return-var-val var (bodyOf state))) )))
 
 ;if-else statement in the form of "if condition, then stmt1. Else, stmt2
-(define cond-stmt
+(define cond-stmt-with-else
   (lambda (condition stmt1 stmt2 state)
-    (if (M-value condition state) (M-state stmt1 state) (M-state stmt2 state))));stmt1 stmt2)))
+    (if (M-value condition state) (M-state stmt1 state) (M-state stmt2 state))))
+
+(define cond-stmt-no-else
+  (lambda (condition stmt1 state)
+    (if (M-value condition state) (M-state stmt1 state) state)))
 
 (define while
   (lambda (condition loopbody state)
