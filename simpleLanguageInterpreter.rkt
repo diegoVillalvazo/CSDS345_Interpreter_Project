@@ -80,7 +80,19 @@
 ;M-declare but it assigns the variable declared as well  :Might condense the line of headOf bodyOf's into something else
 (define M-declare-assign
   (lambda (stmt state)
-    (M-assign (cons '= (cons (headOf (bodyOf stmt)) (cons (headOf (bodyOf (bodyOf stmt))) '()))) (M-declare (cons (headOf stmt) (cons (headOf (bodyOf stmt)) '())) state))))
+    (M-assign (cons '= (cons (getDeclareAssignVar stmt) (cons (getDeclareAssignVal stmt) '()))) (M-declare (cons (getDeclareAssignToDeclareVarType stmt) (cons (getDeclareAssignToDeclareVarName stmt) '())) state)))) ;(cons (headOf (bodyOf stmt)) (cons (headOf (bodyOf (bodyOf stmt))) '())))         (M-declare (cons (headOf stmt) (cons (headOf (bodyOf stmt)) '())) state))))
+
+;returns the variable to be used in the declare-assign statement
+(define getDeclareAssignVar cadr)
+
+;returns the value to be used in the declare-assign statement
+(define getDeclareAssignVal caddr)
+
+;returns the type of the variable to be declared in a declare-assign statement
+(define getDeclareAssignToDeclareVarType car)
+
+;returns the name of the variable to be declared ina declare-assign statement
+(define getDeclareAssignToDeclareVarName cadr)
 
 ;takes a statement and a state, evaluates whether or not a variable is declared yet. If it is, it pairs it with the corresponding value
 (define M-assign
@@ -93,6 +105,7 @@
     (if (equal? (getStmt1 stmt) (getStmt2 stmt)) (cond-stmt-no-else (getCondition stmt) (getStmt1 stmt) state)
     (cond-stmt-with-else (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state))))
 
+;helper function that takes the while loop statement and calls on the main function with the right inputs
 (define M-while-loop
   (lambda (stmt state)
     (while (getCondition stmt) (getWhileBody stmt) state)))
@@ -132,7 +145,6 @@
   (lambda (expr state)
     (if (eq? (getLength expr) 2) (* -1 (M-value(getLeftOp expr) state)) (- (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state))) ))
        
-
 ;return the operator
 (define getOp car)
 
@@ -154,10 +166,10 @@
 ;return getLinkedVal
 (define getLinkedVal cdr)
 
-;returns the first item in a list <-rename, it sounds awful
+;returns the first item in a list
 (define headOf car)
 
-;returns the body of the list <-rename, it sounds awful
+;returns the body of the list
 (define bodyOf cdr)
 
 ;returns condition
@@ -175,12 +187,12 @@
       ((eq? (getStmtType stmt) 'if) (cadddr stmt)) ;if the second statement is another conditional statement, return the other conditoinal statement
       (else (cadddr stmt))))) ;otherwise it isn't so just return the statement
      
-
 ;returns the length of a statement
 (define getLength
   (lambda (stmt)
     (if (null? stmt) 0 (+ 1 (getLength (bodyOf stmt))))))
 
+;returns the loop body of the while statement
 (define getWhileBody caddr)
 
 ;returns whether var has been declared by checking if it is in the state
@@ -237,50 +249,12 @@
   (lambda (condition stmt1 stmt2 state)
     (if (M-value condition state) (M-state stmt1 state) (M-state stmt2 state))))
 
+
 (define cond-stmt-no-else
   (lambda (condition stmt1 state)
     (if (M-value condition state) (M-state stmt1 state) state)))
 
+;while loop statement in the form of "while condition stmt"
 (define while
   (lambda (condition loopbody state)
     (if (M-value condition state) (while condition loopbody (M-state loopbody state)) state)))
-
-
-
-
-;TESTS
-
-;(M-var 'x '((y)(x)(a)))
-
-;(return-var-val 'z '((x 10)(y 25)(z 5)))
-
-;(initialized? 'x '((a)(b)(x)(d)))
-
-;(interpret-start '((var x)(var y)(var z)(= x 5)(= z (* 2 x))(= y (+ 5 (* 7 5)))(if (> z x) (= x 0) (= z 0))) '())
-
-;(interpret-start '((var x)(= x #t)) '())
-
-;(interpret-start '((var x)(var y)(= x #t)) '())
-
-;(cond-stmt '(< a b) #t #f '((a 15) (b 10)))         ;<---- apparently just having #t and #f doesn't work. Im guessing we need a return function
-;(cond-stmt '(== a b) #t #f '((a 15) (b 10)))
-;(cond-stmt '(>= a b) #t #f '((a 15) (b 10)))
-;(cond-stmt '(!= a b) #t #f '((a 15) (b 10)))
-;(cond-stmt '(< a b) '(return #t) '(return #f) '((a 15) (b 10))) ;<--- tried adding return, all it does is return the state but like idk
-;(interpret-start '((var a 10)(var b)(= b 1)(if (> b a) (var x #t) (var y #t))) '())
-;(interpret-start '((var a #t)(var b #t)(= b (! b))(if (!= b a) (var c #t) (var d #t))) '())
-;(M-declare-assign '(var x 10) '())
-;(M-var 'a '((a 15)(b 16)))
-;(M-value '(< a b) '((a 15)(b 14)))
-;(interpret "sampleProgram.txt")
-
-;(interpret-start '((return a)) '((a 15)(return)))
-;(run-program "tests/test10.txt")
-;(interpret-start '((var x (- 5 2))) (initState))
-;(interpret-start '((var x 5)(var y 6)(var a (> x y))) (initState))
-;(run-program "sampleProgram.txt")
-;(run-program "tests/ifelsetest.txt")
-;(interpret-start '((var x)(var y)(var z)(= x 1)(= y (+ 5 (+ 3 2)))(= z x)) '())
-;(M-declare-assign '((var x = 5)) '())
-;(M-declare-assign '((var x = (+ 3 (* 9 1)))) '())
-;(M-var 'x '((x 5)(y)(z)))
