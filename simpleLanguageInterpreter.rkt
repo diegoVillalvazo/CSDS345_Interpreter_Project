@@ -1,5 +1,6 @@
 ;Simple Language Interpreter - CSDS 345
 ;By Robbie Hammond and Diego Villalvazo
+; while only runs the first one 
 
 #lang racket
 
@@ -89,7 +90,7 @@
     (cond
       ((null? stmt-list) state)
       (else
-       (interpret-start (bodyOf stmt-list) (M-state (headOf stmt-list) state break continue throw) break continue throw)) )))
+       (interpret-start (bodyOf stmt-list) (M-state (headOf stmt-list) state break continue throw) break continue throw)))))
 
 ;does the all the state manipulation
 (define M-state
@@ -100,14 +101,13 @@
     (display "\n")
     (cond
       ((eq? (getStmtType stmt) 'var)    (M-declare stmt state break continue throw))
-      ((eq? (getStmtType stmt) '=)      (M-assign stmt state break continue throw))
+      ((eq? (getStmtType stmt) '=)      (continue (M-assign stmt state break continue throw)))
       ((eq? (getStmtType stmt) 'if)     (M-cond-stmt stmt state break continue throw))
-      ((eq? (getStmtType stmt) 'while)  (M-while-loop stmt state break continue throw))
+      ((eq? (getStmtType stmt) 'while)  (M-while-loop stmt state (lambda (v) v) break continue throw))
       ((eq? (getStmtType stmt) 'return) (M-return stmt state break continue throw))
       ((eq? (getStmtType stmt) 'begin)  (cons (cons (interpret-start (cdr stmt) state break continue throw) '()) state));(M-block (cdr stmt) state (initState)));(interpret-start (cdr stmt) state));(M-block stmt state))
       ((eq? (getStmtType stmt) 'break)  (list (break (cadr stmt))))
       (else
-       (display stmt)
        (error 'unknown_statement)) )))
 
 ;(define M-block
@@ -157,7 +157,7 @@
 ;takes a statement and a state, evaluates whether or not a variable is declared yet. If it is, it pairs it with the corresponding value
 (define M-assign
   (lambda (stmt state break continue throw)
-    (if (declared? (getVar stmt) state) (assign-to (getVar stmt) state (M-value (getVal stmt) state break continue throw)) (error 'var_not_declared)) ))
+    (if (declared? (getVar stmt) state) (assign-to (getVar stmt) state (M-value (getVal stmt) state break continue throw)) (error 'var_not_declared))))
 
 ;helper function that passes appropriate values for condition statement
 (define M-cond-stmt
@@ -167,8 +167,8 @@
 
 ;helper function that takes the while loop statement and calls on the main function with the right inputs
 (define M-while-loop
-  (lambda (stmt state break continue throw)
-    (while (getCondition stmt) (getWhileBody stmt) state (lambda (v) v) break continue throw)))
+  (lambda (stmt state next break continue throw)
+    (while (getCondition stmt) (getWhileBody stmt) state next break continue throw) (continue state)))
 
 ;returns a statement
 (define M-return
@@ -178,7 +178,6 @@
 ;returns the value of a mathematical expression
 (define M-value
   (lambda (expr state break continue throw)
-    
     (cond
       ((number? expr) expr)
       ((booleanAtom? expr) (convertToBoolean expr))
@@ -335,7 +334,7 @@
 (define loop
   (lambda (condition stmt state next break continue throw)
     (if (M-value condition state next break throw)
-        (M-state stmt state (lambda (v) (M-state stmt v (while condition stmt v next break continue throw) break continue throw)) continue throw) (next state))))
+        (M-state stmt state break (lambda (s) (while condition stmt s next break continue throw)) throw) (next state))))
 
 ;(define loop
 ;  (lambda (condition stmt state next break continue throw)
