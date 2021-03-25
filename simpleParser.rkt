@@ -311,7 +311,6 @@
     (multterm-parse-helper (operand-parse firstsymbol))))
 
 ; parse the multiplication expression.
-
 (define multterm-parse-helper
   (lambda (firstoperand)
      (let ((op (get-next-symbol)))

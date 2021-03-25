@@ -163,12 +163,12 @@
 (define M-cond-stmt
   (lambda (stmt state break continue throw)
     (if (equal? (getStmt1 stmt) (getStmt2 stmt)) (cond-stmt-no-else (getCondition stmt) (getStmt1 stmt) state break continue throw)
-    (cond-stmt-with-else (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state))))
+    (cond-stmt-with-else (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state break continue throw))))
 
 ;helper function that takes the while loop statement and calls on the main function with the right inputs
 (define M-while-loop
   (lambda (stmt state break continue throw)
-    (while (getCondition stmt) (getWhileBody stmt) state break continue throw)))
+    (while (getCondition stmt) (getWhileBody stmt) state (lambda (v) v) break continue throw)))
 
 ;returns a statement
 (define M-return
@@ -178,12 +178,13 @@
 ;returns the value of a mathematical expression
 (define M-value
   (lambda (expr state break continue throw)
+    
     (cond
       ((number? expr) expr)
       ((booleanAtom? expr) (convertToBoolean expr))
       ((var? expr) (M-var expr state)) ;<--- should take care of all variables
       ((eq? (getOp expr) '+)      (+          (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
-      ((eq? (getOp expr) '-)      (checkMinusSignUsage expr state break continue throw))
+      ((eq? (getOp expr) '-)      (-          (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
       ((eq? (getOp expr) '*)      (*          (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
       ((eq? (getOp expr) '/)      (quotient   (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
       ((eq? (getOp expr) '%)      (remainder  (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
@@ -202,8 +203,9 @@
 
 ;checks if the '- is either unary or binary
 (define checkMinusSignUsage
-  (lambda (expr state)
-    (if (eq? (getLength expr) 2) (* -1 (M-value(getLeftOp expr) state)) (- (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state))) ))
+  (lambda (expr state break continue throw)
+    (
+    (if (eq? (getLength expr) 2) (* -1 (M-value (getLeftOp expr) state break continue throw)) (- (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw))) )))
        
 ;return the operator
 (define getOp car)
@@ -306,20 +308,43 @@
        (return-var-val var (bodyOf state))) )))
 
 ;Evaluates an if-else statement in the form of "if condition, then stmt1. Else, stmt2"
+;Now works with scoping
 (define cond-stmt-with-else
   (lambda (condition stmt1 stmt2 state break continue throw)
-    (if (M-value condition state) (M-state stmt1 state break continue throw
+    (if (M-value condition state break continue throw) (M-state stmt1 state break continue throw
                                            ) (M-state stmt2 state break continue throw))))
 
 ;evaluates an if statement (without else) in the form of "if condition, then stmt1."
+;Now works with scoping
 (define cond-stmt-no-else
   (lambda (condition stmt1 state break continue throw)
     (if (M-value condition state break continue throw) (M-state stmt1 state break continue throw) state)))
 
 ;while loop statement in the form of "while condition stmt"
+;(define while
+;  (lambda (condition loopbody state break continue throw)
+;    (if (M-value condition state break continue throw) (while condition loopbody (M-state loopbody state break continue throw) break continue throw) state)))
+
+
+; doesn't work
 (define while
-  (lambda (condition loopbody state break continue throw)
-    (if (M-value condition state break continue throw) (while condition loopbody (M-state loopbody state break continue throw) break continue throw) state)))
+  (lambda (condition stmt state next oldbreak continue throw)
+    (loop condition stmt state next (lambda (v) (next v)) continue throw)))
+
+
+(define loop
+  (lambda (condition stmt state next break continue throw)
+    (if (M-value condition state next break throw)
+        (M-state stmt state (lambda (v) (M-state stmt v (while condition stmt v next break continue throw) break continue throw)) continue throw) (next state))))
+
+;(define loop
+;  (lambda (condition stmt state next break continue throw)
+;    (if (M-value condition state next break throw)
+;        (display "if reached") (display "else reached"))))
+
+
+        
+        
 
 ;(inState? 'x '((x 5) (y 10)))
 ;(updateState '((x 10) (y 5)) '((x 5) (y 3)))
@@ -329,4 +354,4 @@
 ;(interpret-start '((var x 10) (begin (var y) (= y 6) (var z 5)) (return z)) (initState))
 ;(interpret-start '((var x 0) (var y 10) (while (> y x) (begin (var a 20) (= x (+ a a)))) (return x)) (initState))
 ;(interpret-start '((var x 10) (begin (var y) (= y 6) (break 5) (var z 5)) (return z)) (initState) defaultGoto defaultGoto defaultGoto)
-(run-program "tests/test2.txt")
+(run-program "tests/test0.txt")
