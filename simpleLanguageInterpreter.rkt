@@ -18,8 +18,15 @@
 ;get rid of the most recent 
 (define popScope
   (lambda (state)
-    (cdr state)))
+    (if (number? (car state)) state (cdr state))))
+    ;(cdr state)))
 
+;push in a scope
+(define pushScope
+  (lambda (scope state)
+      (cons scope state)))
+
+;tests whether a variable is in a given state
 (define inState?
   (lambda (el state)
     (cond
@@ -27,6 +34,7 @@
       ((eq? (car (car state)) el) #t)
       (else (inState? el (cdr state))))))
 
+;returns the last element in a list
 (define getLastElement
   (lambda (lis)
     (cond
@@ -34,14 +42,18 @@
       ((null? (cdr lis)) (car lis))
       (else (getLastElement (cdr lis))))))
 
-; doesn't work, but should update old state with what happened in new state
+;updates the old state with what happened in new state
 (define updateState
   (lambda (scopedState fullState)
     (cond
       ((null? scopedState) fullState)
-      ((inState? (car (car scopedState)) fullState) (updateState (cdr scopedState) ((M-state fullState)) ));update
+      ((inState? (car (car scopedState)) fullState) (updateState (cdr scopedState) (transferToState (car scopedState) fullState)));((M-state fullState defaultGoto defaultGoto defaultGoto defaultGoto)) ));update
       (else (updateState (cdr scopedState) fullState)))))
 
+;essentially takes a value, say (x 20) and converts it to a statement such as (= x 20) and passes that as a statement on the state
+(define transferToState
+  (lambda (scoped full)
+    (M-state (cons '= (cons (car scoped) (cons (cadr scoped) '()))) full defaultGoto defaultGoto defaultGoto)))
 
 ;tests if the input is the atom 'true or 'false
 (define booleanAtom?
@@ -69,7 +81,7 @@
 ;helper function to start state with 'return
 (define initState
   (lambda ()
-    '(return) ))
+    '((return)) ))
 
 ;essentially a helper function for abstraction
 (define interpret
@@ -88,6 +100,8 @@
   (lambda (stmt-list state break continue throw)
     (cond
       ((null? stmt-list) state)
+      ((atom? (car state)) (car state))
+      ((atom? state) state)
       (else
        (interpret-start (bodyOf stmt-list) (M-state (headOf stmt-list) state break continue throw) break continue throw)) )))
 
@@ -104,29 +118,33 @@
       ((eq? (getStmtType stmt) 'if)     (M-cond-stmt stmt state break continue throw))
       ((eq? (getStmtType stmt) 'while)  (M-while-loop stmt state break continue throw))
       ((eq? (getStmtType stmt) 'return) (M-return stmt state break continue throw))
-      ((eq? (getStmtType stmt) 'begin)  (cons (cons (interpret-start (cdr stmt) state break continue throw) '()) state));(M-block (cdr stmt) state (initState)));(interpret-start (cdr stmt) state));(M-block stmt state))
+      ((eq? (getStmtType stmt) 'begin)  (M-block stmt state break continue throw))
       ((eq? (getStmtType stmt) 'break)  (list (break (cadr stmt))))
       (else
        (display stmt)
        (error 'unknown_statement)) )))
 
-;(define M-block
-;  (lambda (stmt state)
-;    (cons (car (M-state (cdr stmt) state)) state)
-;    (cdr state)))
+;basically "catches" the block of code and starts interpretation the same way as interpret-start does
+(define M-block
+  (lambda (stmt state break continue throw)
+    (updateState (car (pushScope (M-block-interpret (bodyOf stmt) (returnUpperScope state) break continue throw) state)) state)))
 
-;(define M-block
-;  (lambda (stmt state)
-;    (cond
-;      ((null? (cdr stmt)) state)
-;      (else (cons (M-block (cdr stmt) (M-state (cadr stmt) state)) state))))) ;add the evaluated block statement to the front of state
+;interpret the actual code in the block
+(define M-block-interpret
+  (lambda (stmt state break continue throw)
+    (cond
+      ((null? stmt) state);(display state))
+      (else (M-block-interpret (bodyOf stmt) (M-state (headOf stmt) state break continue throw) break continue throw)))))
 
-;(define M-block
-;  (lambda (stmt-list oldState newState)
-;    (cond
-;      ((null? stmt-list) (cons newState oldState))
-;      (else
-;       (M-block (cdr stmt-list) oldState (M-state (headOf stmt-list) newState))))))
+;returns the "upper" scope of a state - i.e. the variables that are above the current scope
+(define returnUpperScope
+  (lambda (state)
+    (cond
+      ((null? state) '())
+      ((list? (headOf (headOf state))) (returnUpperScope (bodyOf state)))
+      ((eq? (headOf (headOf state)) 'return) (returnUpperScope (bodyOf state)))
+      (else
+       (cons (headOf state) (returnUpperScope (bodyOf state)))))))
 
 ;takes a variable name and adds it to the state
 (define M-declare
@@ -141,6 +159,9 @@
 (define M-declare-assign
   (lambda (stmt state break continue throw)
     (M-assign (cons '= (cons (getDeclareAssignVar stmt) (cons (getDeclareAssignVal stmt) '()))) (M-declare (cons (getDeclareAssignToDeclareVarType stmt) (cons (getDeclareAssignToDeclareVarName stmt) '())) state break continue throw) break continue throw) )) ;(cons (headOf (bodyOf stmt)) (cons (headOf (bodyOf (bodyOf stmt))) '())))         (M-declare (cons (headOf stmt) (cons (headOf (bodyOf stmt)) '())) state))))
+
+;returns the statement list for a block
+(define getStmtList cdr)
 
 ;returns the variable to be used in the declare-assign statement
 (define getDeclareAssignVar cadr)
@@ -163,7 +184,7 @@
 (define M-cond-stmt
   (lambda (stmt state break continue throw)
     (if (equal? (getStmt1 stmt) (getStmt2 stmt)) (cond-stmt-no-else (getCondition stmt) (getStmt1 stmt) state break continue throw)
-    (cond-stmt-with-else (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state))))
+    (cond-stmt-with-else (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state break continue throw))))
 
 ;helper function that takes the while loop statement and calls on the main function with the right inputs
 (define M-while-loop
@@ -183,7 +204,7 @@
       ((booleanAtom? expr) (convertToBoolean expr))
       ((var? expr) (M-var expr state)) ;<--- should take care of all variables
       ((eq? (getOp expr) '+)      (+          (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
-      ((eq? (getOp expr) '-)      (checkMinusSignUsage expr state break continue throw))
+      ((eq? (getOp expr) '-)      (checkMinusSignUsage expr state))
       ((eq? (getOp expr) '*)      (*          (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
       ((eq? (getOp expr) '/)      (quotient   (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
       ((eq? (getOp expr) '%)      (remainder  (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
@@ -308,7 +329,7 @@
 ;Evaluates an if-else statement in the form of "if condition, then stmt1. Else, stmt2"
 (define cond-stmt-with-else
   (lambda (condition stmt1 stmt2 state break continue throw)
-    (if (M-value condition state) (M-state stmt1 state break continue throw
+    (if (M-value condition state break continue throw) (M-state stmt1 state break continue throw
                                            ) (M-state stmt2 state break continue throw))))
 
 ;evaluates an if statement (without else) in the form of "if condition, then stmt1."
@@ -325,8 +346,18 @@
 ;(updateState '((x 10) (y 5)) '((x 5) (y 3)))
 ;(display "\n\n\n")
 ;(interpret "tests_old/test19.txt")
-;(run-program "tests/test1.txt")
+;(run-program "tests/test2.txt")
 ;(interpret-start '((var x 10) (begin (var y) (= y 6) (var z 5)) (return z)) (initState))
 ;(interpret-start '((var x 0) (var y 10) (while (> y x) (begin (var a 20) (= x (+ a a)))) (return x)) (initState))
 ;(interpret-start '((var x 10) (begin (var y) (= y 6) (break 5) (var z 5)) (return z)) (initState) defaultGoto defaultGoto defaultGoto)
-(run-program "tests/test2.txt")
+;(run-program "tests/test2.txt")
+;(run-program "tests/test6.txt")
+
+;(interpret-start '((var x 10) (begin (var a 5) (var b 20) (= x (+ x a))) (return x)) (initState) defaultGoto defaultGoto defaultGoto)
+
+;(returnUpperScope '(((d 1) (f 2)) (a 20) ((w 109) (j true)) (b 10)))
+
+;(popScope (pushScope '((a 20)(b 30)) '((x 1)(y 2)(z 3)(return))))
+
+;(updateState '((a 20) (b 30) (x 1)) '((x 20)(return)))
+
