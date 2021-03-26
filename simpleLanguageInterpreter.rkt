@@ -110,6 +110,7 @@
     (display stmt)
     (display "\n")
     (cond
+      ((var? stmt)                      (M-value stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'var)    (M-declare stmt state return break continue throw))
       ((eq? (getStmtType stmt) '=)      (M-assign stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'if)     (M-cond-stmt stmt state return break continue throw))
@@ -360,7 +361,7 @@
 ;(run-program "tests/test7.txt") ;<---- doesnt work
 ;(interpret-start '((var x 10)(var y 2)(begin (var a 9000)(var b 8000)(= x (+ x b)))(return x)) initState defaultGoto defaultGoto defaultGoto defaultGoto)
 ;(interpret-start '((var x 0) (var result 0) (while (< x 10) (begin (if (> result 15) (begin (return result))) (= result (+ result x)) (= x (+ x 1)))) (return result)))
-(interpret-start '((var x 10)(var a 0) (if (== 10 x) (begin (return (= a (+ a x)))) (begin (var y (* 2 x)) (return y)))))
+(interpret-start '((var x 10)(var a 0) (if (== 10 x) (begin (= a (+ a x)) (return a)) (begin (var y (* 2 x)) (return y)))))
 ;(interpret-start '((var x)(= x 10)(return x)))
 
 
