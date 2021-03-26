@@ -115,7 +115,7 @@
       ((eq? (getStmtType stmt) 'if)     (M-cond-stmt stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'while)  (M-while-loop stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'begin)  (M-block stmt state return break continue throw))
-      ((eq? (getStmtType stmt) 'return) (return (M-value (cadr stmt) state return break continue throw)));(return (M-return stmt state return break continue throw)))
+      ((eq? (getStmtType stmt) 'return) (return (M-state (cadr stmt) state return break continue throw)));(return (M-return stmt state return break continue throw)))
       ((eq? (getStmtType stmt) 'break)  (list (break (cadr stmt))))
       (else
        (display stmt)
@@ -203,6 +203,9 @@
       ((eq? (getOp expr) '!)      (not        (M-value(getLeftOp expr) state return break continue throw))) ;does not work with cases such as (! #t)
       ;((eq? (getOp expr) 'return) (return (M-value(getLeftOp expr) state return break continue throw))) <- Not necessary
       (else
+       (display "Unknown operator: ")(display (getOp expr))(display "\n")
+       (display "Current state: ")(display state)(display "\n")
+       (display "Current expression: ")(display expr)(display "\n")
        (error 'unknown_operator)) )))
 
 ;checks if the '- is either unary or binary
@@ -356,4 +359,9 @@
 ;(interpret "tests/test7.txt")
 ;(run-program "tests/test7.txt") ;<---- doesnt work
 ;(interpret-start '((var x 10)(var y 2)(begin (var a 9000)(var b 8000)(= x (+ x b)))(return x)) initState defaultGoto defaultGoto defaultGoto defaultGoto)
-(interpret-start '((var x 0) (var result 0) (while (< x 10) (begin (if (> result 15) (begin (return result))) (= result (+ result x)) (= x (+ x 1)))) (return result)))
+;(interpret-start '((var x 0) (var result 0) (while (< x 10) (begin (if (> result 15) (begin (return result))) (= result (+ result x)) (= x (+ x 1)))) (return result)))
+(interpret-start '((var x 10)(var a 0) (if (== 10 x) (begin (return (= a (+ a x)))) (begin (var y (* 2 x)) (return y)))))
+;(interpret-start '((var x)(= x 10)(return x)))
+
+
+
