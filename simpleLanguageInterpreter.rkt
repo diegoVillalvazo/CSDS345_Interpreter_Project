@@ -120,7 +120,11 @@
       ((eq? (getStmtType stmt) 'continue) (continue state));(car stmt)));(list (continue (car state))))
       ((eq? (getStmtType stmt) 'break)  (list (break (cadr stmt))))
       (else
+       (display "\n")
+       (display "\n")
        (display stmt)
+       (display "\n")
+       (display state)
        (error 'unknown_statement)) )))
 
 ;basically "catches" the block of code and starts interpretation the same way as interpret-start does
@@ -297,17 +301,13 @@
   ;(lambda (condition loopbody state return break continue throw)
     ;(display loopbody)
     ;(if (M-value condition state return break continue throw) (while condition loopbody (M-state loopbody state return break (lambda (s) (while condition loopbody s return break continue throw)) throw) return break continue throw) state)))
-
 (define while
   (lambda (condition loopbody state return break continue throw)
-    (setFlagFor (lambda (newBreak) (loop condition loopbody state return newBreak continue throw)))))
+     (call/cc (lambda (newContinue) (loop condition loopbody state return break newContinue throw))) state))
 
 (define loop
-  (lambda (condition loopbody state return break oldContinue throw)
-    (if (M-value condition state return break oldContinue throw)
-        (loop condition loopbody (M-state loopbody state return break (setFlagFor (lambda (newContinue) (loop condition loopbody state return break newContinue throw))) throw)) ;(loop condition loopbody newContinue return break defaultGoto throw))) throw)) 
-        state)))
-
+  (lambda (condition loopbody state return break continue throw)
+    (if (M-value condition state return break continue throw) (M-state loopbody state return break (lambda (s) (while condition loopbody s return break continue throw) state return break continue throw) throw) state)))
 ;(define while
 ;  (lambda (condition loopbody state return break continueOld throw)
 ;    (setFlagFor (lambda (newBreak)
@@ -390,6 +390,14 @@
 
 ;returns the loop body of the while statement
 (define getWhileBody caddr);cdaddr);caddr)
+
+(define createAssignment
+  (lambda (lis)
+    (display lis)
+    (display "\n")
+    (cond
+      ((null? lis) '())
+      ((list? (car lis)) (cons (cons '= (car lis)) (createAssignment (cdr lis)))))))
 
 ;(interpret "tests/test8.txt")
 (run-program "tests/test8.txt")
