@@ -74,7 +74,7 @@
       (else
        a) )))
 
-;helper function to start state with 'return
+;helper function to start state
 (define initState '() )
 
 ;essentially a helper function for abstraction
@@ -112,7 +112,7 @@
       ((eq? (getStmtType stmt) 'if)     (M-cond-stmt stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'while)  (M-while-loop stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'begin)  (M-block stmt state return break continue throw))
-      ((eq? (getStmtType stmt) 'return) (return (M-return stmt state return break continue throw)))
+      ((eq? (getStmtType stmt) 'return) (return (M-value (cadr stmt) state return break continue throw)));(return (M-return stmt state return break continue throw)))
       ((eq? (getStmtType stmt) 'break)  (list (break (cadr stmt))))
       (else
        (display stmt)
@@ -138,7 +138,6 @@
       ((null? state) '())
       ((number? state))
       ((list? (headOf (headOf state))) (returnUpperScope (bodyOf state)))
-      ((eq? (headOf (headOf state)) 'return) (returnUpperScope (bodyOf state)))
       (else
        (cons (headOf state) (returnUpperScope (bodyOf state)))))))
 
@@ -199,7 +198,7 @@
       ((eq? (getOp expr) '&&)     (and        (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
       ((eq? (getOp expr) '||)     (or         (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
       ((eq? (getOp expr) '!)      (not        (M-value(getLeftOp expr) state return break continue throw))) ;does not work with cases such as (! #t)
-      ((eq? (getOp expr) 'return) (return (M-value(getLeftOp expr) state return break continue throw)))
+      ;((eq? (getOp expr) 'return) (return (M-value(getLeftOp expr) state return break continue throw))) <- Not necessary
       (else
        (error 'unknown_operator)) )))
 
@@ -353,5 +352,5 @@
 ;vvv TESTS vvv
 ;(interpret "tests/test7.txt")
 ;(run-program "tests/test7.txt") ;<---- doesnt work
-
+(interpret-start '((return (* 5 4))) initState defaultGoto defaultGoto defaultGoto defaultGoto)
 
