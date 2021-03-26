@@ -296,7 +296,7 @@
 (define while
   (lambda (condition loopbody state return break continue throw)
     (display loopbody)
-    (if (M-value condition state return break continue throw) (while condition loopbody (M-state condition loopbody state return break (setFlagFor (lambda (s) (while condition loopbody s return break continue throw))) throw) return break continue throw) (continue state))))
+    (if (M-value condition state return break continue throw) (while condition loopbody (M-state loopbody state return break (lambda (s) (while condition loopbody s return break continue throw)) throw) return break continue throw) state)))
 
 (define loop
   (lambda (condition loopbody state return break continue throw)
