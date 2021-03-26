@@ -117,7 +117,7 @@
       ((eq? (getStmtType stmt) 'while)  (M-while-loop stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'begin)  (M-block stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'return) (return (M-state (cadr stmt) state return break continue throw)));(return (M-return stmt state return break continue throw)))
-      ((eq? (getStmtType stmt) 'continue) (continue state))
+      ((eq? (getStmtType stmt) 'continue) (continue state));(car stmt)));(list (continue (car state))))
       ((eq? (getStmtType stmt) 'break)  (list (break (cadr stmt))))
       (else
        (display stmt)
@@ -293,15 +293,44 @@
     (if (M-value condition state return break continue throw) (M-state stmt1 state return break continue throw) state)))
 
 ;while loop statement in the form of "while condition stmt"
+;(define while
+  ;(lambda (condition loopbody state return break continue throw)
+    ;(display loopbody)
+    ;(if (M-value condition state return break continue throw) (while condition loopbody (M-state loopbody state return break (lambda (s) (while condition loopbody s return break continue throw)) throw) return break continue throw) state)))
+
 (define while
   (lambda (condition loopbody state return break continue throw)
-    (display loopbody)
-    (if (M-value condition state return break continue throw) (while condition loopbody (M-state loopbody state return break (lambda (s) (while condition loopbody s return break continue throw)) throw) return break continue throw) state)))
+    (setFlagFor (lambda (newBreak) (loop condition loopbody state return newBreak continue throw)))))
 
 (define loop
-  (lambda (condition loopbody state return break continue throw)
-    (if (M-value condition state return break continue throw)
-    (M-state loopbody state break (call/cc (lambda (s) (while condition loopbody s return break continue throw))) throw) (continue state))))
+  (lambda (condition loopbody state return break oldContinue throw)
+    (if (M-value condition state return break oldContinue throw)
+        (loop condition loopbody (M-state loopbody state return break (setFlagFor (lambda (newContinue) (loop condition loopbody state return break newContinue throw))) throw)) ;(loop condition loopbody newContinue return break defaultGoto throw))) throw)) 
+        state)))
+
+;(define while
+;  (lambda (condition loopbody state return break continueOld throw)
+;    (setFlagFor (lambda (newBreak)
+;                (if (M-value condition state return newBreak continueOld throw)
+;                    (while condition loopbody (M-state loopbody state return break (setFlagFor (lambda (newContinue) (newBreak state)) throw) return break continueOld throw))
+;                    state)))))
+    ;(if (M-value condition state return break continueOld throw)
+        ;(while condition loopbody (M-state loopbody state break (setFlagFor (lambda (continueNew) (while condition loopbody state return break continueNew throw))) throw) return break continueOld throw)
+        ;(state))))
+     
+
+;(define loop
+  ;(lambda (condition loopbody state return break continue throw)
+    ;(if (M-value condition state return break continue throw)
+        ;(M-state loopbody state break (call/cc (lambda (c) (while condition loopbody c return break continue throw))) throw)
+        ;(continue state))))
+        ;(while condition loopbody (M-state loopbody state return break continue throw) return break continue throw)
+        ;state)))
+                
+;(define loop
+  ;(lambda (condition loopbody state return break continue throw)
+    ;(if (M-value condition state return break continue throw)
+    ;(M-state loopbody state break (call/cc (lambda (s) (while condition loopbody s return break continue throw))) throw) (continue state))))
 
 ;vvv DEFINITIONS AND OTHER STUFF vvv
 
@@ -362,8 +391,9 @@
 ;returns the loop body of the while statement
 (define getWhileBody caddr);cdaddr);caddr)
 
+;(interpret "tests/test8.txt")
 (run-program "tests/test8.txt")
-
+;(interpret-start '((var x 0)(var y 10)(while (< x y) (begin (= x (+ x 1))))(return x)))
 
 ;vvv TESTS vvv
 ;(interpret "tests/test7.txt")
