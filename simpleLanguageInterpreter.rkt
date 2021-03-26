@@ -5,21 +5,16 @@
 
 (require "simpleParser.rkt")
 
+;vvv MAIN COMPILER vvv
+
 ;tests if input is an atom
 (define (atom? a)
   (and (not (pair? a)) (not (null? a)) (not (boolean? a)))) ;added boolean case
-
-;basically call/cc
-(define setFlagFor call/cc)
-
-;just for rn for all the got functions
-(define defaultGoto (lambda (v) v))
 
 ;get rid of the most recent 
 (define popScope
   (lambda (state)
     (if (number? (car state)) state (cdr state))))
-    ;(cdr state)))
 
 ;push in a scope
 (define pushScope
@@ -47,13 +42,14 @@
   (lambda (scopedState fullState)
     (cond
       ((null? scopedState) fullState)
+      ((number? scopedState) scopedState)
       ((inState? (car (car scopedState)) fullState) (updateState (cdr scopedState) (transferToState (car scopedState) fullState)));((M-state fullState defaultGoto defaultGoto defaultGoto defaultGoto)) ));update
       (else (updateState (cdr scopedState) fullState)))))
 
 ;essentially takes a value, say (x 20) and converts it to a statement such as (= x 20) and passes that as a statement on the state
 (define transferToState
   (lambda (scoped full)
-    (M-state (cons '= (cons (car scoped) (cons (cadr scoped) '()))) full defaultGoto defaultGoto defaultGoto)))
+    (M-state (cons '= (cons (car scoped) (cons (cadr scoped) '()))) full defaultGoto defaultGoto defaultGoto defaultGoto)))
 
 ;tests if the input is the atom 'true or 'false
 (define booleanAtom?
@@ -79,9 +75,7 @@
        a) )))
 
 ;helper function to start state with 'return
-(define initState
-  (lambda ()
-    '((return)) ))
+(define initState '() )
 
 ;essentially a helper function for abstraction
 (define interpret
@@ -93,32 +87,32 @@
 
 (define run-program
   (lambda (fileName)
-    (interpret-start (interpret fileName) (initState) defaultGoto defaultGoto defaultGoto) ))
+    (interpret-start (interpret fileName) initState defaultGoto defaultGoto defaultGoto defaultGoto) ))
 
 ;iterates through the statements in a statement list, takes a state
 (define interpret-start
-  (lambda (stmt-list state break continue throw)
+  (lambda (stmt-list state return break continue throw)
     (cond
       ((null? stmt-list) state)
-      ((atom? (car state)) (car state))
       ((atom? state) state)
+      ;((atom? (car state)) (car state))
       (else
-       (interpret-start (bodyOf stmt-list) (M-state (headOf stmt-list) state break continue throw) break continue throw)) )))
+       (interpret-start (bodyOf stmt-list) (M-state (headOf stmt-list) state return break continue throw) return break continue throw)) )))
 
 ;does the all the state manipulation
 (define M-state
-  (lambda (stmt state break continue throw)
+  (lambda (stmt state return break continue throw)
     (display state)
     (display "       ")
     (display stmt)
     (display "\n")
     (cond
-      ((eq? (getStmtType stmt) 'var)    (M-declare stmt state break continue throw))
-      ((eq? (getStmtType stmt) '=)      (M-assign stmt state break continue throw))
-      ((eq? (getStmtType stmt) 'if)     (M-cond-stmt stmt state break continue throw))
-      ((eq? (getStmtType stmt) 'while)  (M-while-loop stmt state break continue throw))
-      ((eq? (getStmtType stmt) 'return) (M-return stmt state break continue throw))
-      ((eq? (getStmtType stmt) 'begin)  (M-block stmt state break continue throw))
+      ((eq? (getStmtType stmt) 'var)    (M-declare stmt state return break continue throw))
+      ((eq? (getStmtType stmt) '=)      (M-assign stmt state return break continue throw))
+      ((eq? (getStmtType stmt) 'if)     (M-cond-stmt stmt state return break continue throw))
+      ((eq? (getStmtType stmt) 'while)  (M-while-loop stmt state return break continue throw))
+      ((eq? (getStmtType stmt) 'begin)  (M-block stmt state return break continue throw))
+      ((eq? (getStmtType stmt) 'return) (return (M-return stmt state return break continue throw)))
       ((eq? (getStmtType stmt) 'break)  (list (break (cadr stmt))))
       (else
        (display stmt)
@@ -126,21 +120,23 @@
 
 ;basically "catches" the block of code and starts interpretation the same way as interpret-start does
 (define M-block
-  (lambda (stmt state break continue throw)
-    (updateState (car (pushScope (M-block-interpret (bodyOf stmt) (returnUpperScope state) break continue throw) state)) state)))
+  (lambda (stmt state return break continue throw)
+    (updateState (car (pushScope (M-block-interpret (bodyOf stmt) (returnUpperScope state) return break continue throw) state)) state)))
 
 ;interpret the actual code in the block
 (define M-block-interpret
-  (lambda (stmt state break continue throw)
+  (lambda (stmt state return break continue throw)
     (cond
       ((null? stmt) state);(display state))
-      (else (M-block-interpret (bodyOf stmt) (M-state (headOf stmt) state break continue throw) break continue throw)))))
+      ((number? state) state)
+      (else (M-block-interpret (bodyOf stmt) (M-state (headOf stmt) state return break continue throw) return break continue throw)))))
 
 ;returns the "upper" scope of a state - i.e. the variables that are above the current scope
 (define returnUpperScope
   (lambda (state)
     (cond
       ((null? state) '())
+      ((number? state))
       ((list? (headOf (headOf state))) (returnUpperScope (bodyOf state)))
       ((eq? (headOf (headOf state)) 'return) (returnUpperScope (bodyOf state)))
       (else
@@ -148,117 +144,69 @@
 
 ;takes a variable name and adds it to the state
 (define M-declare
-  (lambda (stmt state break continue throw)
+  (lambda (stmt state return break continue throw)
     (cond
       ((eq? (getLength stmt) 2) (cons (cons (getVar stmt) '()) state))
-      ((eq? (getLength stmt) 3) (M-declare-assign stmt state break continue throw))
+      ((eq? (getLength stmt) 3) (M-declare-assign stmt state return break continue throw))
       (else
        (error 'expected_2_or_3_values)))))
 
 ;M-declare but it assigns the variable declared as well  :Might condense the line of headOf bodyOf's into something else
 (define M-declare-assign
-  (lambda (stmt state break continue throw)
-    (M-assign (cons '= (cons (getDeclareAssignVar stmt) (cons (getDeclareAssignVal stmt) '()))) (M-declare (cons (getDeclareAssignToDeclareVarType stmt) (cons (getDeclareAssignToDeclareVarName stmt) '())) state break continue throw) break continue throw) )) ;(cons (headOf (bodyOf stmt)) (cons (headOf (bodyOf (bodyOf stmt))) '())))         (M-declare (cons (headOf stmt) (cons (headOf (bodyOf stmt)) '())) state))))
-
-;returns the statement list for a block
-(define getStmtList cdr)
-
-;returns the variable to be used in the declare-assign statement
-(define getDeclareAssignVar cadr)
-
-;returns the value to be used in the declare-assign statement
-(define getDeclareAssignVal caddr)
-
-;returns the type of the variable to be declared in a declare-assign statement
-(define getDeclareAssignToDeclareVarType car)
-
-;returns the name of the variable to be declared ina declare-assign statement
-(define getDeclareAssignToDeclareVarName cadr)
+  (lambda (stmt state return break continue throw)
+    (M-assign (cons '= (cons (getDeclareAssignVar stmt) (cons (getDeclareAssignVal stmt) '()))) (M-declare (cons (getDeclareAssignToDeclareVarType stmt) (cons (getDeclareAssignToDeclareVarName stmt) '())) state return break continue throw) return break continue throw) )) ;(cons (headOf (bodyOf stmt)) (cons (headOf (bodyOf (bodyOf stmt))) '())))         (M-declare (cons (headOf stmt) (cons (headOf (bodyOf stmt)) '())) state))))
 
 ;takes a statement and a state, evaluates whether or not a variable is declared yet. If it is, it pairs it with the corresponding value
 (define M-assign
-  (lambda (stmt state break continue throw)
-    (if (declared? (getVar stmt) state) (assign-to (getVar stmt) state (M-value (getVal stmt) state break continue throw)) (error 'var_not_declared)) ))
+  (lambda (stmt state return break continue throw)
+    (if (declared? (getVar stmt) state) (assign-to (getVar stmt) state (M-value (getVal stmt) state return break continue throw)) (error 'var_not_declared)) ))
 
 ;helper function that passes appropriate values for condition statement
 (define M-cond-stmt
-  (lambda (stmt state break continue throw)
-    (if (equal? (getStmt1 stmt) (getStmt2 stmt)) (cond-stmt-no-else (getCondition stmt) (getStmt1 stmt) state break continue throw)
-    (cond-stmt-with-else (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state break continue throw))))
+  (lambda (stmt state return break continue throw)
+    (if (equal? (getStmt1 stmt) (getStmt2 stmt)) (cond-stmt-no-else (getCondition stmt) (getStmt1 stmt) state return break continue throw)
+    (cond-stmt-with-else (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state return break continue throw))))
 
 ;helper function that takes the while loop statement and calls on the main function with the right inputs
 (define M-while-loop
-  (lambda (stmt state break continue throw)
-    (while (getCondition stmt) (getWhileBody stmt) state break continue throw)))
+  (lambda (stmt state return break continue throw)
+    (while (getCondition stmt) (getWhileBody stmt) state return break continue throw)))
 
 ;returns a statement
 (define M-return
-  (lambda (stmt state break continue throw)
-    (convertToProperBoolean(M-value stmt state break continue throw))))
+  (lambda (stmt state return break continue throw)
+    (convertToProperBoolean(M-value stmt state return break continue throw))))
 
 ;returns the value of a mathematical expression
 (define M-value
-  (lambda (expr state break continue throw)
+  (lambda (expr state return break continue throw)
     (cond
+      ((number? state) state)
       ((number? expr) expr)
       ((booleanAtom? expr) (convertToBoolean expr))
       ((var? expr) (M-var expr state)) ;<--- should take care of all variables
-      ((eq? (getOp expr) '+)      (+          (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
-      ((eq? (getOp expr) '-)      (checkMinusSignUsage expr state))
-      ((eq? (getOp expr) '*)      (*          (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
-      ((eq? (getOp expr) '/)      (quotient   (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
-      ((eq? (getOp expr) '%)      (remainder  (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
-      ((eq? (getOp expr) '==)     (eq?        (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
-      ((eq? (getOp expr) '!=)     (not(eq?    (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw))))
-      ((eq? (getOp expr) '<)      (<          (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
-      ((eq? (getOp expr) '>)      (>          (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
-      ((eq? (getOp expr) '<=)     (<=         (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
-      ((eq? (getOp expr) '>=)     (>=         (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
-      ((eq? (getOp expr) '&&)     (and        (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
-      ((eq? (getOp expr) '||)     (or         (M-value(getLeftOp expr) state break continue throw) (M-value(getRightOp expr) state break continue throw)))
-      ((eq? (getOp expr) '!)      (not        (M-value(getLeftOp expr) state break continue throw))) ;does not work with cases such as (! #t)
-      ((eq? (getOp expr) 'return) (M-value(getLeftOp expr) state break continue throw))
+      ((eq? (getOp expr) '+)      (+          (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
+      ((eq? (getOp expr) '-)      (checkMinusSignUsage expr state return break continue throw))
+      ((eq? (getOp expr) '*)      (*          (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
+      ((eq? (getOp expr) '/)      (quotient   (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
+      ((eq? (getOp expr) '%)      (remainder  (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
+      ((eq? (getOp expr) '==)     (eq?        (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
+      ((eq? (getOp expr) '!=)     (not(eq?    (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw))))
+      ((eq? (getOp expr) '<)      (<          (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
+      ((eq? (getOp expr) '>)      (>          (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
+      ((eq? (getOp expr) '<=)     (<=         (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
+      ((eq? (getOp expr) '>=)     (>=         (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
+      ((eq? (getOp expr) '&&)     (and        (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
+      ((eq? (getOp expr) '||)     (or         (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
+      ((eq? (getOp expr) '!)      (not        (M-value(getLeftOp expr) state return break continue throw))) ;does not work with cases such as (! #t)
+      ((eq? (getOp expr) 'return) (return (M-value(getLeftOp expr) state return break continue throw)))
       (else
        (error 'unknown_operator)) )))
 
 ;checks if the '- is either unary or binary
 (define checkMinusSignUsage
-  (lambda (expr state)
-    (if (eq? (getLength expr) 2) (* -1 (M-value(getLeftOp expr) state)) (- (M-value(getLeftOp expr) state) (M-value(getRightOp expr) state))) ))
-       
-;return the operator
-(define getOp car)
-
-;return the left operand
-(define getLeftOp cadr)
-
-;return the right operand
-(define getRightOp caddr)
-
-;returns the first sign in a statement
-(define getStmtType car)
-  
-;return var
-(define getVar cadr)
-
-;return value
-(define getVal caddr)
-
-;return getLinkedVal
-(define getLinkedVal cdr)
-
-;returns the first item in a list
-(define headOf car)
-
-;returns the body of the list
-(define bodyOf cdr)
-
-;returns condition
-(define getCondition cadr)
-
-;returns result for if
-(define getStmt1 caddr)
-
+  (lambda (expr state return break continue throw)
+    (if (eq? (getLength expr) 2) (* -1 (M-value(getLeftOp expr) state return break continue throw)) (- (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw))) ))
 
 ;returns result for then
 (define getStmt2
@@ -273,12 +221,12 @@
   (lambda (stmt)
     (if (null? stmt) 0 (+ 1 (getLength (bodyOf stmt))))))
 
-;returns the loop body of the while statement
-(define getWhileBody caddr);cdaddr);caddr)
-
 ;returns whether var has been declared by checking if it is in the state
 (define declared?
   (lambda (var state)
+    ;(display "\n***CURRENT STATE***: ")
+    ;(display state)
+    ;(display "\n")
     (cond
       ((null? state) #f)
       ((list? (headOf state)) (or (declared? var (headOf state)) (declared? var (bodyOf state))))
@@ -328,36 +276,82 @@
 
 ;Evaluates an if-else statement in the form of "if condition, then stmt1. Else, stmt2"
 (define cond-stmt-with-else
-  (lambda (condition stmt1 stmt2 state break continue throw)
-    (if (M-value condition state break continue throw) (M-state stmt1 state break continue throw
-                                           ) (M-state stmt2 state break continue throw))))
+  (lambda (condition stmt1 stmt2 state return break continue throw)
+    (if (M-value condition state return break continue throw) (M-state stmt1 state return break continue throw
+                                           ) (M-state stmt2 state return break continue throw))))
 
 ;evaluates an if statement (without else) in the form of "if condition, then stmt1."
 (define cond-stmt-no-else
-  (lambda (condition stmt1 state break continue throw)
-    (if (M-value condition state break continue throw) (M-state stmt1 state break continue throw) state)))
+  (lambda (condition stmt1 state return break continue throw)
+    (if (M-value condition state return break continue throw) (M-state stmt1 state return break continue throw) state)))
 
 ;while loop statement in the form of "while condition stmt"
 (define while
-  (lambda (condition loopbody state break continue throw)
-    (if (M-value condition state break continue throw) (while condition loopbody (M-state loopbody state break continue throw) break continue throw) state)))
+  (lambda (condition loopbody state return break continue throw)
+    (if (M-value condition state return break continue throw) (while condition loopbody (M-state loopbody state return break continue throw) return break continue throw) state)))
 
-;(inState? 'x '((x 5) (y 10)))
-;(updateState '((x 10) (y 5)) '((x 5) (y 3)))
-;(display "\n\n\n")
-;(interpret "tests_old/test19.txt")
-;(run-program "tests/test2.txt")
-;(interpret-start '((var x 10) (begin (var y) (= y 6) (var z 5)) (return z)) (initState))
-;(interpret-start '((var x 0) (var y 10) (while (> y x) (begin (var a 20) (= x (+ a a)))) (return x)) (initState))
-;(interpret-start '((var x 10) (begin (var y) (= y 6) (break 5) (var z 5)) (return z)) (initState) defaultGoto defaultGoto defaultGoto)
-;(run-program "tests/test2.txt")
-;(run-program "tests/test6.txt")
+;vvv DEFINITIONS AND OTHER STUFF vvv
 
-;(interpret-start '((var x 10) (begin (var a 5) (var b 20) (= x (+ x a))) (return x)) (initState) defaultGoto defaultGoto defaultGoto)
+;basically call/cc
+(define setFlagFor call/cc)
 
-;(returnUpperScope '(((d 1) (f 2)) (a 20) ((w 109) (j true)) (b 10)))
+;just for rn for all the got functions
+(define defaultGoto (lambda (v) v))
 
-;(popScope (pushScope '((a 20)(b 30)) '((x 1)(y 2)(z 3)(return))))
+;returns the statement list for a block
+(define getStmtList cdr)
 
-;(updateState '((a 20) (b 30) (x 1)) '((x 20)(return)))
+;returns the variable to be used in the declare-assign statement
+(define getDeclareAssignVar cadr)
+
+;returns the value to be used in the declare-assign statement
+(define getDeclareAssignVal caddr)
+
+;returns the type of the variable to be declared in a declare-assign statement
+(define getDeclareAssignToDeclareVarType car)
+
+;returns the name of the variable to be declared ina declare-assign statement
+(define getDeclareAssignToDeclareVarName cadr)
+
+;return the operator
+(define getOp car)
+
+;return the left operand
+(define getLeftOp cadr)
+
+;return the right operand
+(define getRightOp caddr)
+
+;returns the first sign in a statement
+(define getStmtType car)
+  
+;return var
+(define getVar cadr)
+
+;return value
+(define getVal caddr)
+
+;return getLinkedVal
+(define getLinkedVal cdr)
+
+;returns the first item in a list
+(define headOf car)
+
+;returns the body of the list
+(define bodyOf cdr)
+
+;returns condition
+(define getCondition cadr)
+
+;returns result for if
+(define getStmt1 caddr)
+
+;returns the loop body of the while statement
+(define getWhileBody caddr);cdaddr);caddr)
+
+
+;vvv TESTS vvv
+;(interpret "tests/test7.txt")
+;(run-program "tests/test7.txt") ;<---- doesnt work
+
 
