@@ -87,17 +87,20 @@
 
 (define run-program
   (lambda (fileName)
-    (interpret-start (interpret fileName) initState defaultGoto defaultGoto defaultGoto defaultGoto) ))
+    (interpret-start (interpret fileName))));(interpret fileName) initState defaultGoto defaultGoto defaultGoto defaultGoto) ))
+
+(define interpret-start
+  (lambda (stmt-list)
+    (setFlagFor (lambda (return) (interpret-loop stmt-list initState return defaultGoto defaultGoto defaultGoto)))))
 
 ;iterates through the statements in a statement list, takes a state
-(define interpret-start
+(define interpret-loop
   (lambda (stmt-list state return break continue throw)
     (cond
       ((null? stmt-list) state)
       ((atom? state) state)
-      ;((atom? (car state)) (car state))
       (else
-       (interpret-start (bodyOf stmt-list) (M-state (headOf stmt-list) state return break continue throw) return break continue throw)) )))
+       (interpret-loop (bodyOf stmt-list) (M-state (headOf stmt-list) state return break continue throw) return break continue throw)) )))
 
 ;does the all the state manipulation
 (define M-state
@@ -352,5 +355,5 @@
 ;vvv TESTS vvv
 ;(interpret "tests/test7.txt")
 ;(run-program "tests/test7.txt") ;<---- doesnt work
-(interpret-start '((return (* 5 4))) initState defaultGoto defaultGoto defaultGoto defaultGoto)
-
+;(interpret-start '((var x 10)(var y 2)(begin (var a 9000)(var b 8000)(= x (+ x b)))(return x)) initState defaultGoto defaultGoto defaultGoto defaultGoto)
+(interpret-start '((var x 0) (var result 0) (while (< x 10) (begin (if (> result 15) (begin (return result))) (= result (+ result x)) (= x (+ x 1)))) (return result)))
