@@ -117,6 +117,7 @@
       ((eq? (getStmtType stmt) 'while)  (M-while-loop stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'begin)  (M-block stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'return) (return (M-state (cadr stmt) state return break continue throw)));(return (M-return stmt state return break continue throw)))
+      ((eq? (getStmtType stmt) 'continue) (continue state))
       ((eq? (getStmtType stmt) 'break)  (list (break (cadr stmt))))
       (else
        (display stmt)
@@ -294,7 +295,13 @@
 ;while loop statement in the form of "while condition stmt"
 (define while
   (lambda (condition loopbody state return break continue throw)
-    (if (M-value condition state return break continue throw) (while condition loopbody (M-state loopbody state return break continue throw) return break continue throw) state)))
+    (display loopbody)
+    (if (M-value condition state return break continue throw) (while condition loopbody (M-state condition loopbody state return break (setFlagFor (lambda (s) (while condition loopbody s return break continue throw))) throw) return break continue throw) (continue state))))
+
+(define loop
+  (lambda (condition loopbody state return break continue throw)
+    (if (M-value condition state return break continue throw)
+    (M-state loopbody state break (call/cc (lambda (s) (while condition loopbody s return break continue throw))) throw) (continue state))))
 
 ;vvv DEFINITIONS AND OTHER STUFF vvv
 
@@ -355,13 +362,15 @@
 ;returns the loop body of the while statement
 (define getWhileBody caddr);cdaddr);caddr)
 
+(run-program "tests/test8.txt")
+
 
 ;vvv TESTS vvv
 ;(interpret "tests/test7.txt")
 ;(run-program "tests/test7.txt") ;<---- doesnt work
 ;(interpret-start '((var x 10)(var y 2)(begin (var a 9000)(var b 8000)(= x (+ x b)))(return x)) initState defaultGoto defaultGoto defaultGoto defaultGoto)
 ;(interpret-start '((var x 0) (var result 0) (while (< x 10) (begin (if (> result 15) (begin (return result))) (= result (+ result x)) (= x (+ x 1)))) (return result)))
-(interpret-start '((var x 10)(var a 0) (if (== 10 x) (begin (= a (+ a x)) (return a)) (begin (var y (* 2 x)) (return y)))))
+;(interpret-start '((var x 10)(var a 0) (if (== 10 x) (begin (= a (+ a x)) (return a)) (begin (var y (* 2 x)) (return y)))))
 ;(interpret-start '((var x)(= x 10)(return x)))
 
 
