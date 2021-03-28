@@ -82,6 +82,7 @@
   (lambda (fileName)
     (parser fileName) ))
 
+
 ;actually runs the program and initializes an empty state, works more like a helper function
 (provide run-program)
 
@@ -106,7 +107,7 @@
 (define M-state
   (lambda (stmt state return break continue throw)
     (display state)
-    (display "       ")
+    (display "            ")
     (display stmt)
     (display "\n")
     (cond
@@ -117,7 +118,7 @@
       ((eq? (getStmtType stmt) 'while)  (M-while-loop stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'begin)  (M-block stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'return) (return (M-state (cadr stmt) state return break continue throw)));(return (M-return stmt state return break continue throw)))
-      ((eq? (getStmtType stmt) 'continue) (continue state));(car stmt)));(list (continue (car state))))
+      ((eq? (getStmtType stmt) 'continue) (display "here") (continue state));(car stmt)));(list (continue (car state))))
       ((eq? (getStmtType stmt) 'break)  (list (break (cadr stmt))))
       (else
        (display "\n")
@@ -178,7 +179,7 @@
 ;helper function that takes the while loop statement and calls on the main function with the right inputs
 (define M-while-loop
   (lambda (stmt state return break continue throw)
-    (while (getCondition stmt) (getWhileBody stmt) state return break continue throw)))
+    (call/cc (lambda (v)  (while (getCondition stmt) (getWhileBody stmt) state return v break continue throw)))))
 
 ;returns a statement
 (define M-return
@@ -302,12 +303,14 @@
     ;(display loopbody)
     ;(if (M-value condition state return break continue throw) (while condition loopbody (M-state loopbody state return break (lambda (s) (while condition loopbody s return break continue throw)) throw) return break continue throw) state)))
 (define while
-  (lambda (condition loopbody state return break continue throw)
-     (call/cc (lambda (newContinue) (loop condition loopbody state return break newContinue throw))) state))
+  (lambda (condition stmt state return next oldbreak continue throw)
+    (call/cc (lambda (newCont) (loop condition stmt state next return oldbreak newCont throw)))))
+
 
 (define loop
-  (lambda (condition loopbody state return break continue throw)
-    (if (M-value condition state return break continue throw) (M-state loopbody state return break (lambda (s) (while condition loopbody s return break continue throw) state return break continue throw) throw) state)))
+  (lambda (condition stmt state next return break continue throw)
+    (if (M-value condition state next break continue throw)
+        (M-state stmt state return break (M-state stmt state return break (lambda (s) (while condition stmt s next return break continue throw)) throw) throw) (next state))))
 ;(define while
 ;  (lambda (condition loopbody state return break continueOld throw)
 ;    (setFlagFor (lambda (newBreak)
