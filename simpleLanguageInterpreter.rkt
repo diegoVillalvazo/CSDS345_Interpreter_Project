@@ -183,9 +183,10 @@
     (cond-stmt-with-else (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state return break continue throw))))
 
 ;helper function that takes the while loop statement and calls on the main function with the right inputs
-(define M-while-loop
-  (lambda (stmt state return break continue throw)
-    (call/cc (lambda (v)  (while (getCondition stmt) (getWhileBody stmt) state return v break continue throw)))))
+;(define M-while-loop
+;  (lambda (stmt state return break continue throw)
+;    (call/cc (lambda (v)  (while (getCondition stmt) (getWhileBody stmt) state return v break continue throw)))))
+
 
 ;returns a statement
 (define M-return
@@ -308,15 +309,33 @@
   ;(lambda (condition loopbody state return break continue throw)
     ;(display loopbody)
     ;(if (M-value condition state return break continue throw) (while condition loopbody (M-state loopbody state return break (lambda (s) (while condition loopbody s return break continue throw)) throw) return break continue throw) state)))
+
+(define M-while-loop
+  (lambda (stmt state return break continue throw)
+    (if (not (member 'continue (flatten (getWhileBody stmt))))
+    (while-no-cont (getCondition stmt) (getWhileBody stmt) state return break continue throw)
+    (call/cc (lambda (v) (while (getCondition stmt) (getWhileBody stmt) state return v break continue throw))))))
+
+
+
 (define while
   (lambda (condition stmt state return next oldbreak continue throw)
     (call/cc (lambda (newCont) (loop condition stmt state next return oldbreak newCont throw)))))
-
 
 (define loop
   (lambda (condition stmt state next return break continue throw)
     (if (M-value condition state next break continue throw)
         (M-state stmt state return break (M-state stmt state return break (lambda (s) (while condition stmt s next return break continue throw)) throw) throw) (next state))))
+
+
+(define while-no-cont
+  (lambda (condition loopbody state return break continue throw)
+    (display loopbody)
+    (if (M-value condition state return break continue throw) (while-no-cont condition loopbody (M-state loopbody state return break (lambda (s) (while-no-cont condition loopbody s return break continue throw)) throw) return break continue throw) state)))
+
+
+
+
 ;(define while
 ;  (lambda (condition loopbody state return break continueOld throw)
 ;    (setFlagFor (lambda (newBreak)
@@ -422,13 +441,19 @@
       ((null? lis) '())
       ((list? (car lis)) (cons (cons '= (car lis)) (createAssignment (cdr lis)))))))
 
+(define (is-in-list list value)
+ (cond
+  [(empty? list) false]
+  [(= (first list) value) true]
+  [else (is-in-list (rest list) value)]))
+
 ;(interpret "tests/test8.txt")
-;(run-program "tests/test8.txt")
+(run-program "tests/test9.txt")
 ;(interpret-start '((var x 0)(var y 10)(while (< x y) (begin (= x (+ x 1))))(return x)))
 
 ;(varNotInitializedError (lambda (v) v))
 
-(interpret-start '((var b 1) (= b (+ b a))))
+;(interpret-start '((var b 1) (= b (+ b a))))
 
 ;vvv TESTS vvv
 ;(interpret "tests/test7.txt")
