@@ -92,7 +92,12 @@
 
 (define interpret-start
   (lambda (stmt-list)
-    (setFlagFor (lambda (return) (interpret-loop stmt-list initState return defaultGoto defaultGoto defaultGoto)))))
+    ;(interpret-loop stmt-list initState (setFlagFor (lambda (return) return))
+    (setFlagFor (lambda (return)
+                (setFlagFor (lambda (break)
+                            (setFlagFor (lambda (continue)
+                                        (setFlagFor (lambda (throw)
+                                                    (interpret-loop stmt-list initState return break continue throw)))))))))))
 
 ;iterates through the statements in a statement list, takes a state
 (define interpret-loop
@@ -100,6 +105,7 @@
     (cond
       ((null? stmt-list) state)
       ((atom? state) state)
+      ((string? state) state)
       (else
        (interpret-loop (bodyOf stmt-list) (M-state (headOf stmt-list) state return break continue throw) return break continue throw)) )))
 
@@ -193,7 +199,7 @@
       ((number? state) state)
       ((number? expr) expr)
       ((booleanAtom? expr) (convertToBoolean expr))
-      ((var? expr) (M-var expr state)) ;<--- should take care of all variables
+      ((var? expr) (M-var expr state return break continue throw)) ;<--- should take care of all variables
       ((eq? (getOp expr) '+)      (+          (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
       ((eq? (getOp expr) '-)      (checkMinusSignUsage expr state return break continue throw))
       ((eq? (getOp expr) '*)      (*          (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
@@ -273,8 +279,8 @@
 
 ;checks whether a var has been declared and if it is, then it returns the value of target var
 (define M-var
-  (lambda (expr state)
-    (if (and (declared? expr state) (initialized? expr state)) (return-var-val expr state) (error 'var_not_initialized)) ))
+  (lambda (expr state return break continue throw)
+    (if (and (declared? expr state) (initialized? expr state)) (return-var-val expr state) (varNotInitializedError break))));(error 'var_not_initialized)) ))
 
 ;returns the variable value from a state
 (define return-var-val
@@ -334,6 +340,20 @@
   ;(lambda (condition loopbody state return break continue throw)
     ;(if (M-value condition state return break continue throw)
     ;(M-state loopbody state break (call/cc (lambda (s) (while condition loopbody s return break continue throw))) throw) (continue state))))
+
+;produces an error as a string
+(define giveError
+  (lambda (str); . source)
+    str));(string-append str (string-append " " (symbol->string source)))))
+
+
+(define varNotDeclaredError
+  (lambda (break)
+   (break (giveError "Variable not declared"))))
+
+(define varNotInitializedError
+  (lambda (break)
+   (break (giveError "Variable not initialized"))))
 
 ;vvv DEFINITIONS AND OTHER STUFF vvv
 
@@ -403,8 +423,12 @@
       ((list? (car lis)) (cons (cons '= (car lis)) (createAssignment (cdr lis)))))))
 
 ;(interpret "tests/test8.txt")
-(run-program "tests/test8.txt")
+;(run-program "tests/test8.txt")
 ;(interpret-start '((var x 0)(var y 10)(while (< x y) (begin (= x (+ x 1))))(return x)))
+
+;(varNotInitializedError (lambda (v) v))
+
+(interpret-start '((var b 1) (= b (+ b a))))
 
 ;vvv TESTS vvv
 ;(interpret "tests/test7.txt")
