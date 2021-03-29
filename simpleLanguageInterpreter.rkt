@@ -58,12 +58,12 @@
 
 ;converts a booleanAtom to a boolean
 (define convertToBoolean
-  (lambda (a)
+  (lambda (a throw)
     (cond
       ((eq? a 'true)  #t)
       ((eq? a 'false) #f)
       (else
-       (error 'not_a_booleanAtom)) )))
+       (varNotBooleanAtomError throw)) )))
 
 ;converts a proper boolean into a booleanAtom
 (define convertToProperBoolean
@@ -81,7 +81,6 @@
 (define interpret
   (lambda (fileName)
     (parser fileName) ))
-
 
 ;actually runs the program and initializes an empty state, works more like a helper function
 (provide run-program)
@@ -105,17 +104,21 @@
     (cond
       ((null? stmt-list) state)
       ((atom? state) state)
-      ((string? state) state)
+      ;((string? state) state)
       (else
+       (display state)
+       (display "       ")
+       (display (car stmt-list))
+       (display "\n")
        (interpret-loop (bodyOf stmt-list) (M-state (headOf stmt-list) state return break continue throw) return break continue throw)) )))
 
 ;does the all the state manipulation
 (define M-state
   (lambda (stmt state return break continue throw)
-    (display state)
-    (display "            ")
-    (display stmt)
-    (display "\n")
+    ;(display state)
+    ;(display "       ")
+    ;(display stmt)
+    ;(display "\n")
     (cond
       ((var? stmt)                      (M-value stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'var)    (M-declare stmt state return break continue throw))
@@ -123,16 +126,19 @@
       ((eq? (getStmtType stmt) 'if)     (M-cond-stmt stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'while)  (M-while-loop stmt state return break continue throw))
       ((eq? (getStmtType stmt) 'begin)  (M-block stmt state return break continue throw))
+      ((eq? (getStmtType stmt) 'try)    (M-try stmt state return break continue throw))
+      ;goto functions
       ((eq? (getStmtType stmt) 'return) (return (M-state (cadr stmt) state return break continue throw)));(return (M-return stmt state return break continue throw)))
-      ((eq? (getStmtType stmt) 'continue) (display "here") (continue state));(car stmt)));(list (continue (car state))))
       ((eq? (getStmtType stmt) 'break)  (list (break (cadr stmt))))
+      ((eq? (getStmtType stmt) 'continue) (continue state));(car stmt)));(list (continue (car state))))
+      ((eq? (getStmtType stmt) 'throw) (throw (cadr stmt)))
       (else
        (display "\n")
        (display "\n")
        (display stmt)
        (display "\n")
        (display state)
-       (error 'unknown_statement)) )))
+       (unknownStatementError throw)) )))
 
 ;basically "catches" the block of code and starts interpretation the same way as interpret-start does
 (define M-block
@@ -164,7 +170,7 @@
       ((eq? (getLength stmt) 2) (cons (cons (getVar stmt) '()) state))
       ((eq? (getLength stmt) 3) (M-declare-assign stmt state return break continue throw))
       (else
-       (error 'expected_2_or_3_values)))))
+       (incorrectNumberOfDeclarationInputsError throw)))))
 
 ;M-declare but it assigns the variable declared as well  :Might condense the line of headOf bodyOf's into something else
 (define M-declare-assign
@@ -174,7 +180,7 @@
 ;takes a statement and a state, evaluates whether or not a variable is declared yet. If it is, it pairs it with the corresponding value
 (define M-assign
   (lambda (stmt state return break continue throw)
-    (if (declared? (getVar stmt) state) (assign-to (getVar stmt) state (M-value (getVal stmt) state return break continue throw)) (error 'var_not_declared)) ))
+    (if (declared? (getVar stmt) state) (assign-to (getVar stmt) state (M-value (getVal stmt) state return break continue throw)) (varNotDeclaredError throw)) ))
 
 ;helper function that passes appropriate values for condition statement
 (define M-cond-stmt
@@ -183,10 +189,23 @@
     (cond-stmt-with-else (getCondition stmt) (getStmt1 stmt) (getStmt2 stmt) state return break continue throw))))
 
 ;helper function that takes the while loop statement and calls on the main function with the right inputs
-;(define M-while-loop
-;  (lambda (stmt state return break continue throw)
-;    (call/cc (lambda (v)  (while (getCondition stmt) (getWhileBody stmt) state return v break continue throw)))))
+(define M-while-loop
+  (lambda (stmt state return break continue throw)
+    (if (not (member 'continue (flatten (getWhileBody stmt))))
+    (while-no-cont (getCondition stmt) (getWhileBody stmt) state return break continue throw)
+    (call/cc (lambda (v) (while (getCondition stmt) (getWhileBody stmt) state return v break continue throw))))))
 
+;defines a while loop with no continue functions
+(define while-no-cont
+  (lambda (condition loopbody state return break continue throw)
+    (display loopbody)
+    (if (M-value condition state return break continue throw) (while-no-cont condition loopbody (M-state loopbody state return break (lambda (s) (while-no-cont condition loopbody s return break continue throw)) throw) return break continue throw) state)))
+
+(define (is-in-list list value)
+ (cond
+  [(empty? list) false]
+  [(= (first list) value) true]
+  [else (is-in-list (rest list) value)]))
 
 ;returns a statement
 (define M-return
@@ -199,7 +218,8 @@
     (cond
       ((number? state) state)
       ((number? expr) expr)
-      ((booleanAtom? expr) (convertToBoolean expr))
+      ((string? expr) expr)
+      ((booleanAtom? expr) (convertToBoolean expr throw))
       ((var? expr) (M-var expr state return break continue throw)) ;<--- should take care of all variables
       ((eq? (getOp expr) '+)      (+          (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
       ((eq? (getOp expr) '-)      (checkMinusSignUsage expr state return break continue throw))
@@ -214,13 +234,12 @@
       ((eq? (getOp expr) '>=)     (>=         (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
       ((eq? (getOp expr) '&&)     (and        (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
       ((eq? (getOp expr) '||)     (or         (M-value(getLeftOp expr) state return break continue throw) (M-value(getRightOp expr) state return break continue throw)))
-      ((eq? (getOp expr) '!)      (not        (M-value(getLeftOp expr) state return break continue throw))) ;does not work with cases such as (! #t)
-      ;((eq? (getOp expr) 'return) (return (M-value(getLeftOp expr) state return break continue throw))) <- Not necessary
+      ((eq? (getOp expr) '!)      (not        (M-value(getLeftOp expr) state return break continue throw)))
       (else
        (display "Unknown operator: ")(display (getOp expr))(display "\n")
        (display "Current state: ")(display state)(display "\n")
        (display "Current expression: ")(display expr)(display "\n")
-       (error 'unknown_operator)) )))
+       (unknownOperatorError throw)) )))
 
 ;checks if the '- is either unary or binary
 (define checkMinusSignUsage
@@ -281,17 +300,17 @@
 ;checks whether a var has been declared and if it is, then it returns the value of target var
 (define M-var
   (lambda (expr state return break continue throw)
-    (if (and (declared? expr state) (initialized? expr state)) (return-var-val expr state) (varNotInitializedError break))));(error 'var_not_initialized)) ))
+    (if (and (declared? expr state) (initialized? expr state)) (return-var-val expr state throw) (varNotInitializedError throw))))
 
 ;returns the variable value from a state
 (define return-var-val
-  (lambda (var state)
+  (lambda (var state throw)
     (cond
-      ((null? state) (error 'no_value_assigned))
-      ((list? (headOf (headOf state))) (return-var-val var (headOf state)))
+      ((null? state) (noValueAssignedError throw))
+      ((list? (headOf (headOf state))) (return-var-val var (headOf state) throw))
       ((eq? (headOf(headOf state)) var) (headOf (bodyOf (headOf state))))
       (else
-       (return-var-val var (bodyOf state))) )))
+       (return-var-val var (bodyOf state) throw)) )))
 
 ;Evaluates an if-else statement in the form of "if condition, then stmt1. Else, stmt2"
 (define cond-stmt-with-else
@@ -304,20 +323,6 @@
   (lambda (condition stmt1 state return break continue throw)
     (if (M-value condition state return break continue throw) (M-state stmt1 state return break continue throw) state)))
 
-;while loop statement in the form of "while condition stmt"
-;(define while
-  ;(lambda (condition loopbody state return break continue throw)
-    ;(display loopbody)
-    ;(if (M-value condition state return break continue throw) (while condition loopbody (M-state loopbody state return break (lambda (s) (while condition loopbody s return break continue throw)) throw) return break continue throw) state)))
-
-(define M-while-loop
-  (lambda (stmt state return break continue throw)
-    (if (not (member 'continue (flatten (getWhileBody stmt))))
-    (while-no-cont (getCondition stmt) (getWhileBody stmt) state return break continue throw)
-    (call/cc (lambda (v) (while (getCondition stmt) (getWhileBody stmt) state return v break continue throw))))))
-
-
-
 (define while
   (lambda (condition stmt state return next oldbreak continue throw)
     (call/cc (lambda (newCont) (loop condition stmt state next return oldbreak newCont throw)))))
@@ -327,52 +332,37 @@
     (if (M-value condition state next break continue throw)
         (M-state stmt state return break (M-state stmt state return break (lambda (s) (while condition stmt s next return break continue throw)) throw) throw) (next state))))
 
+;takes in the full statement and partitions it into the different blocks inside the try statement
+(define M-try
+  (lambda (stmt state return break continue throw)
+     (M-try-start (getTryBlock stmt) (getCatchBlock stmt) (getFinallyBlock stmt) state return break continue throw)));(setFlagFor (lambda (newBreak) (M-try-start (getTryBlock stmt) (getCatchBlock stmt) (getFinallyBlock stmt) state return newBreak continue throw)))))
 
-(define while-no-cont
-  (lambda (condition loopbody state return break continue throw)
-    (display loopbody)
-    (if (M-value condition state return break continue throw) (while-no-cont condition loopbody (M-state loopbody state return break (lambda (s) (while-no-cont condition loopbody s return break continue throw)) throw) return break continue throw) state)))
+;executes the try block and tests for an error, if none, then we return the state
+(define M-try-start
+  (lambda (tryBlock catchBlock finallyBlock state return break continue throw)
+    (cond
+      ;A string is always returned in case of an exception occuring
+      ((or (string? (setFlagFor (lambda (errorThrown) (interpret-loop tryBlock state return break continue errorThrown)))) (number? (setFlagFor (lambda (errorThrown) (interpret-loop tryBlock state return break continue errorThrown))))) (M-try-resolve tryBlock catchBlock finallyBlock (M-try-createCatchVariable tryBlock catchBlock finallyBlock state return break continue throw) return break continue throw)) ;(display "Exception caught"));(interpret-loop tryBlock state return break continue (setFlagFor (lambda (errorType) (throw errorType))))) (display "Caught exception"));(M-state (car tryBlock) state return break continue throw)) (display "caught exception"))
+      (else
+       ;two cases, either we have a finally block to execute or not
+       (if (null? finallyBlock)
+           (interpret-loop tryBlock state return break continue throw)
+           (interpret-loop (getFinallyBlockBody finallyBlock) (interpret-loop tryBlock state return break continue throw) return break continue throw))))))
+       ;(interpret-loop tryBlock state return break continue throw))))) ;(interpret-loop tryBlock state return break continue throw)))))
 
-
-
-
-;(define while
-;  (lambda (condition loopbody state return break continueOld throw)
-;    (setFlagFor (lambda (newBreak)
-;                (if (M-value condition state return newBreak continueOld throw)
-;                    (while condition loopbody (M-state loopbody state return break (setFlagFor (lambda (newContinue) (newBreak state)) throw) return break continueOld throw))
-;                    state)))))
-    ;(if (M-value condition state return break continueOld throw)
-        ;(while condition loopbody (M-state loopbody state break (setFlagFor (lambda (continueNew) (while condition loopbody state return break continueNew throw))) throw) return break continueOld throw)
-        ;(state))))
-     
-
-;(define loop
-  ;(lambda (condition loopbody state return break continue throw)
-    ;(if (M-value condition state return break continue throw)
-        ;(M-state loopbody state break (call/cc (lambda (c) (while condition loopbody c return break continue throw))) throw)
-        ;(continue state))))
-        ;(while condition loopbody (M-state loopbody state return break continue throw) return break continue throw)
-        ;state)))
-                
-;(define loop
-  ;(lambda (condition loopbody state return break continue throw)
-    ;(if (M-value condition state return break continue throw)
-    ;(M-state loopbody state break (call/cc (lambda (s) (while condition loopbody s return break continue throw))) throw) (continue state))))
-
-;produces an error as a string
-(define giveError
-  (lambda (str); . source)
-    str));(string-append str (string-append " " (symbol->string source)))))
+;creates the exception variable that comes as the cadr of the (catch) block
+(define M-try-createCatchVariable
+  (lambda (tryBlock catchBlock finallyBlock state return break continue throw)
+    (M-declare-assign (cons 'var (cons (getCatchBlockErrorVariable catchBlock) (cons (setFlagFor (lambda (errorThrown) (interpret-loop tryBlock state return break continue errorThrown))) '() ))) state return break continue throw)))
+   
+;finishes up the try catch block if it encountered an error
+(define M-try-resolve
+  (lambda (tryBlock catchBlock finallyBlock state return break continue throw)
+    (if (null? finallyBlock)
+        (interpret-loop (getCatchBlockBody catchBlock) state return break continue throw)
+        (interpret-loop (getFinallyBlockBody finallyBlock) (interpret-loop (getCatchBlockBody catchBlock) state return break continue throw) return break continue throw))))
 
 
-(define varNotDeclaredError
-  (lambda (break)
-   (break (giveError "Variable not declared"))))
-
-(define varNotInitializedError
-  (lambda (break)
-   (break (giveError "Variable not initialized"))))
 
 ;vvv DEFINITIONS AND OTHER STUFF vvv
 
@@ -394,7 +384,7 @@
 ;returns the type of the variable to be declared in a declare-assign statement
 (define getDeclareAssignToDeclareVarType car)
 
-;returns the name of the variable to be declared ina declare-assign statement
+;returns the name of the variable to be declared in a declare-assign statement
 (define getDeclareAssignToDeclareVarName cadr)
 
 ;return the operator
@@ -441,27 +431,51 @@
       ((null? lis) '())
       ((list? (car lis)) (cons (cons '= (car lis)) (createAssignment (cdr lis)))))))
 
-(define (is-in-list list value)
- (cond
-  [(empty? list) false]
-  [(= (first list) value) true]
-  [else (is-in-list (rest list) value)]))
 
-;(interpret "tests/test8.txt")
-(run-program "tests/test9.txt")
-;(interpret-start '((var x 0)(var y 10)(while (< x y) (begin (= x (+ x 1))))(return x)))
+;(define caadddr (lambda (lis) (car (cadddr lis))))
 
-;(varNotInitializedError (lambda (v) v))
+(define getTryBlock cadr)
+(define getCatchBlock caddr)
+(define getFinallyBlock cadddr)
+(define getFinallyBlockBody cadr)
+;(define getFinallyBlockLabel car);adddr)
+(define getCatchBlockBody caddr)
+(define getCatchBlockErrorVariable caadr)
 
-;(interpret-start '((var b 1) (= b (+ b a))))
+;defining errors
+(define varNotDeclaredError
+  (lambda (throw)
+   (throw "Variable not declared")))
+
+(define varNotInitializedError
+  (lambda (throw)
+   (throw "Variable not initialized")))
+
+(define varNotBooleanAtomError
+  (lambda (throw)
+    (throw "Variable not a boolean atom")))
+
+(define unknownStatementError
+  (lambda (throw)
+    (throw "Statement not recognized")))
+
+(define unknownOperatorError
+  (lambda (throw)
+    (throw "Unknown operator used")))
+
+(define noValueAssignedError
+  (lambda (throw)
+    (throw "No value assigned for variable")))
+
+(define incorrectNumberOfDeclarationInputsError
+  (lambda (throw)
+    (throw "Expected 2 or 3 values on declaration")))
 
 ;vvv TESTS vvv
-;(interpret "tests/test7.txt")
-;(run-program "tests/test7.txt") ;<---- doesnt work
-;(interpret-start '((var x 10)(var y 2)(begin (var a 9000)(var b 8000)(= x (+ x b)))(return x)) initState defaultGoto defaultGoto defaultGoto defaultGoto)
-;(interpret-start '((var x 0) (var result 0) (while (< x 10) (begin (if (> result 15) (begin (return result))) (= result (+ result x)) (= x (+ x 1)))) (return result)))
-;(interpret-start '((var x 10)(var a 0) (if (== 10 x) (begin (= a (+ a x)) (return a)) (begin (var y (* 2 x)) (return y)))))
-;(interpret-start '((var x)(= x 10)(return x)))
-
+;((var x) (try ((= x 20) (if (< x 0) (throw 10)) (= x (+ x 5))) (catch (e) ((= x e))) (finally ((= x (+ x 100))))) (return x))
+;(run-program "tests/test8.txt")
+;(interpret-start '((var x 5) (var e "yeet") (= x e) (return x)))
+;(interpret "tests/test15.txt")
+;(run-program "tests/test15.txt")
 
 
